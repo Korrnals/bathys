@@ -50,7 +50,25 @@ Bathys — stdio MCP-сервер, поэтому конфиг везде оди
 | Cursor | [docs/integrations/cursor.md](docs/integrations/cursor.md) |
 | Любой другой MCP-клиент | [docs/integrations/generic-mcp.md](docs/integrations/generic-mcp.md) |
 
-Конфиг — только половина дела; вторая половина — научить агента пользоваться конвейером осознанно. Из коробки харнесс получает instructions-playbook (матрицу выбора инструментов), annotations и три стратегии-промпта (`bathys_deep_research`, `bathys_source_audit`, `bathys_fresh_scan`), так что выбирает инструменты Bathys уже нативно. Сильнее — профиль: субагент [`agents/bathys-researcher.md`](agents/bathys-researcher.md) с двумя скиллами, которому глубокий ресёрч делегируется целиком. Как приучить харнесс работать эффективно — в [«Живые кейсы»](docs/getting-started/cases.md) (раздел C); для самых упрямых клиентов — дроп-ин [`agents/HARNESS-DROPIN.md`](agents/HARNESS-DROPIN.md).
+## 🧠 Научить агента работать эффективно
+
+Конфиг — только половина дела. Из коробки харнесс получает **instructions-playbook** (матрицу выбора инструментов), **annotations** и **три стратегии-промпта** — `bathys_deep_research`, `bathys_source_audit`, `bathys_fresh_scan`, — так что выбирает инструменты Bathys уже нативно. Сильнее — профиль: субагент [`agents/bathys-researcher.md`](agents/bathys-researcher.md) с двумя скиллами, которому глубокий ресёрч делегируется целиком; для клиентов, не показывающих MCP instructions, — дроп-ин [`agents/HARNESS-DROPIN.md`](agents/HARNESS-DROPIN.md) в `AGENTS.md` / `CLAUDE.md` / `.cursor/rules`.
+
+Пошаговая инструкция «из коробки → субагент → дроп-ин» и таблица сигналов футеров — в [«Живых кейсах», раздел C](docs/getting-started/cases.md#c-как-научить-харнесс-работать-с-bathys-эффективно).
+
+## 🧭 Ходовые кейсы
+
+**Сравнение технологий.** «Сравни SQLite WAL и PostgreSQL под нагрузку — что выбрать в 2026?» → агент вызывает `deep_research`, доуточняет запрос терминами из найденного и верифицирует вывод по двум источникам. Итог: один вызов вместо цепочки «поиск + N чтений», в контекст попадает 7.5k символов вместо ~35k.
+
+```text
+[bathys: 34 raw hits, top 8 considered · dove 3 pages · 35669 ch fetched → 7508 ch returned · 1.3s]
+```
+
+**Аудит спорного утверждения.** «Правда ли, что в X упали замеры?» → стратегия `bathys_source_audit`: пакетное чтение ссылок из обсуждения + кросс-поиск опровержений → вердикт по каждому тезису с URL. Битая ссылка стоит одну строку, а не сорванный вызов.
+
+**Свежий срез.** «Что нового в Y за две недели?» → `bathys_fresh_scan`: поиск с `time_range=week` → пакетное чтение → сводка с датами; протухший `cache HIT` лечится одним `refresh=true`.
+
+Все кейсы — пользовательские, автономных агентов и эксплуатация — с живыми диалогами и профитом каждого: **[«Живые кейсы» → docs/getting-started/cases.md](docs/getting-started/cases.md)**.
 
 ## 🛠 Инструменты
 
@@ -62,8 +80,6 @@ Bathys — stdio MCP-сервер, поэтому конфиг везде оди
 | `read_urls(urls, query=None, total_chars=12000)` | пакетно читает до 10 известных страниц; бюджет делится между успешными, сбой страницы — одна строка, не сорванный вызов. |
 
 Поиск сужается общими фильтрами `time_range`, `category`, `engines`, `language`. Живой футер ответа показывает сжатие и кэш: `[bathys: 41 raw hits, top 3 considered · dove 3 pages · 35669 ch fetched → 7508 ch returned · 3.2s]`.
-
-Как инструменты справляются с реальными задачами — от сравнения СУБД до аудита слухов — в [«Живых кейсах»](docs/getting-started/cases.md).
 
 ## 📊 Экономия токенов
 
