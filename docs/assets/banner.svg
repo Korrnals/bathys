@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="315" viewBox="0 0 1200 315" role="img" aria-label="Bathys — единый локальный поисковый сервис глубокого ресёрча для ИИ-агентов">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="315" viewBox="0 0 1200 315" role="img" aria-label="Bathys — unified local deep-research search service for AI agents">
   <defs>
     <linearGradient id="deep" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#0a1628"/>
@@ -50,7 +50,7 @@
     </g>
     <!-- wordmark -->
     <text x="380" y="150" font-family="'Segoe UI',Inter,system-ui,sans-serif" font-size="86" font-weight="700" fill="#f1f5f9" letter-spacing="2">Bathys</text>
-    <text x="384" y="196" font-family="'Segoe UI',Inter,system-ui,sans-serif" font-size="26" font-weight="500" fill="#5eead4">единый локальный сервис глубокого ресёрча для ИИ-агентов</text>
+    <text x="384" y="196" font-family="'Segoe UI',Inter,system-ui,sans-serif" font-size="26" font-weight="500" fill="#5eead4">Unified local deep-research search service for AI agents</text>
     <text x="384" y="232" font-family="ui-monospace,'Cascadia Code',Consolas,monospace" font-size="17" fill="#94a3b8">metasearch → extraction → query distillation → cache · zero cloud quotas</text>
     <!-- footer strip: four tools -->
     <g font-family="ui-monospace,Consolas,monospace" font-size="15" fill="#64748b">
