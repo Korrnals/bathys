@@ -1,0 +1,8 @@
+.venv/
+.runtime/
+.archcom/
+__pycache__/
+*.egg-info/
+*.pyc
+dist/
+.pytest_cache/

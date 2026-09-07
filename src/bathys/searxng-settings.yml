@@ -1,0 +1,13 @@
+# Bathys-managed SearXNG settings: localhost-only, JSON API on, limiter off.
+# Used for both the native subprocess backend and the docker backend.
+use_default_settings: true
+server:
+  secret_key: "bathys-local-3f9c2a7e51d84b60"
+  bind_address: "127.0.0.1"
+  port: 8888
+  limiter: false
+  image_proxy: false
+search:
+  safe_search: 1
+  default_lang: "auto"
+  formats: ["html", "json", "csv", "rss"]

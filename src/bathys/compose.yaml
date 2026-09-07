@@ -1,0 +1,22 @@
+# Used by bathys when a container engine (docker/podman) is available.
+# Settings are mounted from the bundled searxng-settings.yml.
+# Image pinned to the same upstream commit as the native-mode SHA pin
+# (config.SEARXNG_REF) — re-pin both together, quarterly (F-302).
+services:
+  searxng:
+    image: searxng/searxng:2026.9.5-c7f3080aa
+    container_name: bathys-searxng
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8888:8080"
+    volumes:
+      - ./searxng-settings.yml:/etc/searxng/settings.yml:ro
+    environment:
+      - SEARXNG_BASE_URL=http://127.0.0.1:8888/
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETGID, SETUID]
+    logging:
+      driver: json-file
+      options:
+        max-size: "1m"
+        max-file: "1"
