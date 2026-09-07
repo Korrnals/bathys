@@ -6,7 +6,8 @@ Order of attempts on a cold start:
      podman-compose) with the bundled compose.yaml — the standard way on a host;
   3. native mode: a private searxng checkout + venv under BATHYS_SEARXNG_HOME,
      cloned and installed on first run, started as a child subprocess — for
-     environments without any container engine (distrobox, plain VPS, CI).
+     environments without any container engine (plain VPS, CI, containers
+     without docker-in-docker).
 
 The mode can be forced with BATHYS_START_MODE=docker|native.
 """

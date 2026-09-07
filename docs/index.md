@@ -8,6 +8,7 @@ Bathys — единый локальный поисковый сервис гл�
 |---|---|
 | Новичку — поставить и подключить за вечер | [charter.md](product/charter.md) → [install.md](getting-started/install.md) → [integrations/overview.md](integrations/overview.md) |
 | Эксплуатация — держать работающим | [configure.md](getting-started/configure.md) → [runbook.md](operations/runbook.md) → [metrics.md](operations/metrics.md) |
+| Хочу увидеть, как это работает на практике | [cases.md](getting-started/cases.md) — живые кейсы: пользовательские, агентские, обучение харнесса |
 | Контрибьютору — понять, как устроено | [architecture/overview.md](architecture/overview.md) → контракты (`docs/contracts/`) → [adr/0001](adr/0001-python-crawl4ai.md)…[0006](adr/0006-three-tool-string-surface.md) |
 
 ## Дерево документации
@@ -18,7 +19,8 @@ docs/
 ├── getting-started/
 │   ├── install.md                  # установка: venv, get-pip, playwright, проверка
 │   ├── configure.md                # 19 env-переменных, настройки SearXNG, START_MODE
-│   └── integrate.md                # базовый конфиг mcpServers, playbook агента
+│   ├── integrate.md                # базовый конфиг mcpServers, playbook агента
+│   └── cases.md                    # живые кейсы: запрос → инструменты → профит; обучение харнесса
 ├── integrations/
 │   ├── overview.md                 # харнессы: таблица, матрица инструментов, нативная интеграция, дроп-ин
 │   ├── zcode.md                    # mcpServers, субагент bathys-researcher, скиллы
@@ -80,6 +82,7 @@ docs/
 | Подключить харнесс (zcode, Claude, Cursor, другой) | [integrations/overview.md](integrations/overview.md) |
 | Поставить субагента bathys-researcher и скиллы | [zcode.md](integrations/zcode.md), [claude-code.md](integrations/claude-code.md) |
 | Базовый блок mcpServers и примеры диалогов | [integrate.md](getting-started/integrate.md) |
+| Посмотреть живые сценарии и научить харнесс эффективной работе | [cases.md](getting-started/cases.md) |
 | Поднятый бэкенд не отвечает, чистить кэш | [runbook.md](operations/runbook.md) |
 | Проверить стек одним запуском (`bathys-doctor`) | [runbook.md](operations/runbook.md) |
 | Сверить цифру экономии | [metrics.md](operations/metrics.md) |
