@@ -24,6 +24,16 @@ jobs:
       - name: Unit tests
         run: python -m unittest discover -s tests -v
 
+  shellcheck:
+    # install.sh is the product's front door — it gets its own lint gate.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: ShellCheck install.sh
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+          shellcheck -S warning install.sh
+
   package:
     # Packaging smoke: build the wheel, install it into a fresh venv together
     # with real deps is heavy (playwright et al.) — here we only verify the

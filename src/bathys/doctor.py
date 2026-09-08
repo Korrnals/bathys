@@ -59,7 +59,7 @@ async def _backend_ping(cfg: Config) -> tuple[bool, str]:
         return False, f"{e.__class__.__name__}: {str(e)[:120]}"
 
 
-async def run_checks(full: bool) -> int:
+async def run_checks(full: bool, start_backend: bool = False) -> int:
     cfg = Config.load()
     results: list[bool] = []
 
@@ -71,11 +71,23 @@ async def run_checks(full: bool) -> int:
 
     results.append(_ok("config loads", True, f"backend={cfg.searxng_url}"))
 
+    if start_backend and cfg.auto_start:
+        import httpx
+
+        from .services import ensure_running
+
+        print("       стартую бэкенд (—start-backend)…")
+        async with httpx.AsyncClient() as _http:
+            try:
+                mode = await ensure_running(cfg, _http)
+                print(f"       бэкенд поднят (режим: {mode})")
+            except Exception as e:  # noqa: BLE001 — diagnostics must not die
+                print(f"       не удалось поднять бэкенд: {e.__class__.__name__}: {e}")
     ping_ok, detail = await _backend_ping(cfg)
     results.append(_ok("searxng backend", ping_ok, detail))
     if not ping_ok and cfg.auto_start:
-        print("       hint: doctor does not auto-start the backend; run any tool "
-              "call once, or start SearXNG yourself")
+        print("       hint: запустите с --start-backend, чтобы поднять бэкенд "
+              "перед проверкой, или сделайте любой вызов инструмента")
 
     marker = cfg.searxng_home / "repo" / ".bathys-ref"
     if cfg.searxng_home.joinpath("repo").is_dir():
@@ -130,9 +142,11 @@ def main() -> None:
     ap = argparse.ArgumentParser(prog="bathys-doctor",
                                  description="Bathys local stack diagnostics")
     ap.add_argument("--full", action="store_true",
-                    help="also launch headless chromium (slower)")
+                    help="также запустить headless chromium (медленнее)")
+    ap.add_argument("--start-backend", action="store_true",
+                    help="поднять бэкенд SearXNG перед проверкой (иначе пинг честно скажет, что сервер не запущен)")
     args = ap.parse_args()
-    raise SystemExit(asyncio.run(run_checks(args.full)))
+    raise SystemExit(asyncio.run(run_checks(args.full, args.start_backend)))
 
 
 if __name__ == "__main__":

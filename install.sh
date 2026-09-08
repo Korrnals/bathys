@@ -29,6 +29,10 @@ die()  { printf "%s\n" "${BOLD}[bathys]${RESET} ERROR: $*" >&2; exit 1; }
 
 VENV_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/bathys/venv"
 
+# Pin a specific version when needed (rollback channel):
+#   BATHYS_INSTALL_VERSION=0.7.0 bash install.sh
+BATHYS_VERSION_SPEC="${BATHYS_INSTALL_VERSION:-bathys}"
+
 # ------------------------------------------------------------------ python --
 find_python() {
     for cand in python3.12 python3.11 python3.10 python3 python; do
@@ -74,11 +78,11 @@ fi
 
 # ---------------------------------------------------------------- install --
 if [ "$UPGRADE" = yes ]; then
-    "$VENV_DIR/bin/pip" install --quiet --upgrade bathys >/dev/null 2>&1 \
-        || die "pip install --upgrade bathys не удался (сеть/PyPI?)"
+    "$VENV_DIR/bin/pip" install --quiet --upgrade "$BATHYS_VERSION_SPEC" >/dev/null 2>&1 \
+        || die "pip install --upgrade \"$BATHYS_VERSION_SPEC\" не удался (сеть/PyPI?)"
 else
-    "$VENV_DIR/bin/pip" install --quiet bathys >/dev/null 2>&1 \
-        || die "pip install bathys не удался (сеть/PyPI?)"
+    "$VENV_DIR/bin/pip" install --quiet "$BATHYS_VERSION_SPEC" >/dev/null 2>&1 \
+        || die "pip install \"$BATHYS_VERSION_SPEC\" не удался (сеть/PyPI?)"
 fi
 [ -x "$VENV_DIR/bin/bathys" ] || die "bathys не появился в venv — проверьте вывод pip вручную"
 

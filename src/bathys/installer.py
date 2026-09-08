@@ -480,6 +480,116 @@ def setup(searxng_home: str | None = None, skip_browser: bool = False) -> int:
     return rc
 
 
+def uninstall(purge: bool, targets: list[str] | None) -> int:
+    """`bathys uninstall` — симметрия установки: снять сервер Bathys с харнессов.
+
+    Удаляет ТОЛЬКО записи `bathys` из конфигов (чужие серверы не трогаются);
+    конфиг-файлы и бэкапы остаются. --purge дополнительно удаляет приватный
+    venv однострочника, кэш и данные (спрашивать подтверждение нечего: вызов
+    уже явно --purge). Точечно: bathys uninstall hermes zcode.
+    """
+    all_targets = _all_targets()
+    names = targets or list(all_targets)
+    removed, absent = [], []
+    for name in names:
+        if name not in all_targets:
+            print(f"[SKIP] {name}: неизвестный таргет (--list для карты)")
+            continue
+        path, dotpath, fmt = all_targets[name]
+        if fmt in ("goose", "hermes"):
+            if not path.is_file():
+                absent.append(name); continue
+            text = path.read_text(encoding="utf-8")
+            if not _yaml_current_ok(text, dotpath, "bathys", fmt, None) \
+               and f"  bathys:" not in text:
+                absent.append(name); continue
+            new_text = _yaml_remove(text, dotpath, "bathys")
+            if new_text != text:
+                bkp = _backup(path)
+                path.write_text(new_text, encoding="utf-8")
+                print(f"[OK] {name}: bathys удалён из {path} (бэкап: {bkp.name})")
+                removed.append(name)
+            else:
+                absent.append(name)
+            continue
+        if not path.is_file():
+            absent.append(name); continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"[SKIP] {name}: {path} не читается ({e.__class__.__name__})")
+            continue
+        servers = _get_by_path(data, dotpath)
+        if not servers or "bathys" not in servers:
+            absent.append(name); continue
+        bkp = _backup(path)
+        servers.pop("bathys", None)
+        path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n",
+                        encoding="utf-8")
+        print(f"[OK] {name}: bathys удалён из {path} (бэкап: {bkp.name})")
+        removed.append(name)
+
+    for name in absent:
+        print(f"[=] {name}: записи bathys не найдено")
+    print(f"Снято с {len(removed)} харнессов; субагенты (если ставились) — "
+          "скопируйте сами: rm ~/.zcode/agents/bathys-researcher.md и т.п.")
+
+    if purge:
+        venv = Path.home() / ".local" / "share" / "bathys" / "venv"
+        cache = Path.home() / ".cache" / "bathys"
+        data = Path.home() / ".local" / "share" / "bathys"
+        import shutil as _sh
+        for label, d in (("venv", venv), ("кэш", cache), ("данные", data)):
+            if d.is_dir() and d != Path.home():
+                _sh.rmtree(d, ignore_errors=True)
+                print(f"[OK] purge: {label} удалён ({d})")
+        print("[i] purge: PATH-строку в ~/.profile или ~/.bashrc удалите вручную "
+              "(одна строка с bathys/venv/bin)")
+    else:
+        print("Кэш и данные НЕ тронуты; полный снос — `bathys uninstall --purge`.")
+    return 0
+
+
+def _yaml_remove(text: str, root: str, name: str) -> str:
+    """Remove root.<name> entry from a flat-roots YAML document."""
+    lines = text.splitlines()
+    out: list[str] = []
+    in_root = False
+    skipping = False
+    for ln in lines:
+        m = _YAML_BLOCK_HDR.match(ln)
+        if m and m.group(1) == root:
+            in_root = True; skipping = False
+            out.append(ln); continue
+        if m and in_root:
+            in_root = False; skipping = False
+            out.append(ln); continue
+        if in_root and re.match(rf"^  {re.escape(name)}:\s*(#.*)?$", ln):
+            skipping = True
+            continue
+        if skipping:
+            if not ln.strip() or ln.startswith("    "):
+                continue
+            skipping = False
+        out.append(ln)
+    return "\n".join(out) + "\n"
+
+
+def uninstall_main() -> None:
+    """`bathys uninstall …` — argparse wrapper for the uninstall subcommand."""
+    ap = argparse.ArgumentParser(
+        prog="bathys uninstall",
+        description="Снять Bathys с харнессов: удаляются только записи `bathys`; "
+                    "чужие серверы и бэкапы не трогаются. --purge — дополнительно "
+                    "venv/кэш/данные.")
+    ap.add_argument("targets", nargs="*", metavar="HARNESS",
+                    help="точечно: имена харнессов (bathys uninstall hermes zcode)")
+    ap.add_argument("--purge", action="store_true",
+                    help="также удалить venv/кэш/данные bathys")
+    args = ap.parse_args()
+    raise SystemExit(uninstall(args.purge, args.targets or None))
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(
         prog="bathys install",

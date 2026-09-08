@@ -372,7 +372,7 @@ def _hush_stdout_logs() -> None:
 
 def main() -> None:
     argv = sys.argv[1:]
-    if argv and argv[0] in ("install", "doctor", "setup"):
+    if argv and argv[0] in ("install", "uninstall", "doctor", "setup"):
         # Console-style subcommands: one entry point covers the MCP server
         # and the setup tooling, so `pip install bathys` is all a user needs.
         from . import doctor, installer
@@ -380,6 +380,9 @@ def main() -> None:
         if argv[0] == "install":
             sys.argv = ["bathys install", *argv[1:]]
             raise SystemExit(installer.main())
+        if argv[0] == "uninstall":
+            sys.argv = ["bathys uninstall", *argv[1:]]
+            raise SystemExit(installer.uninstall_main())
         if argv[0] == "setup":
             sys.argv = ["bathys setup", *argv[1:]]
             raise SystemExit(installer.setup())
@@ -394,6 +397,7 @@ def main() -> None:
               "                                харнессы → субагент → самодиагностика\n"
               "  bathys install [HARNESS…]     автоподключение всех харнессов или точечное\n"
               "                                (bathys install hermes; --list, --print-config)\n"
+              "  bathys uninstall [HARNESS…]   снять Bathys с харнессов (--purge: снос)\n"
               "  bathys doctor [--full]        диагностика стека\n")
         return
     _hush_stdout_logs()
