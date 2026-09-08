@@ -17,8 +17,8 @@ Bathys — единый локальный поисковый сервис гл�
 docs/
 ├── index.md                        # вы здесь: хаб и маршруты
 ├── getting-started/
-│   ├── install.md                  # установка: venv, get-pip, playwright, проверка
-│   ├── configure.md                # 19 env-переменных, настройки SearXNG, START_MODE
+│   ├── install.md                  # установка: однострочник, pip, npm, исходники; снятие
+│   ├── configure.md                # 20 env-переменных, настройки SearXNG, START_MODE
 │   ├── integrate.md                # базовый конфиг mcpServers, playbook агента
 │   └── cases.md                    # живые кейсы: запрос → инструменты → профит; обучение харнесса
 ├── integrations/
@@ -28,7 +28,7 @@ docs/
 │   ├── cursor.md                   # mcp.json, правило .cursor/rules
 │   └── generic-mcp.md              # любой stdio-клиент: команда, env, что из коробки
 ├── operations/
-│   ├── runbook.md                  # старт/останов, логи, кэш, аварии, диагностика bathys-doctor
+│   ├── runbook.md                  # старт/останов, логи, кэш, аварии, снятие, диагностика bathys-doctor
 │   └── metrics.md                  # метрики токен-экономии, SLO, методика подсчёта
 ├── architecture/
 │   ├── overview.md                 # компоненты, модули src/bathys, инварианты
@@ -45,7 +45,7 @@ docs/
 │   ├── mcp-tools.md                # сигнатуры четырёх инструментов и параметры
 │   ├── output-format.md            # контракт футеров и форматов ответов
 │   ├── module-contracts.md         # внутренние инварианты модулей src/bathys
-│   └── config.md                   # полная таблица 19 env-переменных
+│   └── config.md                   # полная таблица 20 env-переменных
 ├── adr/                            # принятые решения, нумерация NNNN-slug
 │   ├── 0001-python-crawl4ai.md     # Python + Crawl4AI как ядро извлечения
 │   ├── 0002-pin-mcp-sdk-v1.md      # пин mcp SDK на v1
@@ -61,7 +61,7 @@ docs/
 ## Репозиторий вне docs/
 
 ```
-├── tests/                    # 72 юнит-теста без сети (unittest, ~0.07 c): python -m unittest discover -s tests
+├── tests/                    # 102 юнит-теста без сети (unittest, ~0.07 c): python -m unittest discover -s tests
 ├── scripts/
 │   ├── smoke.py              # живой прогон конвейера: поиск → нырок → дистиллят
 │   ├── stdio_check.py        # проверка MCP-диалога по stdio
@@ -70,7 +70,7 @@ docs/
 │   └── metrics_report.py     # агрегатор metrics.jsonl в дашборд metrics.md §2
 ├── .github/workflows/ci.yml  # CI: matrix 3.10–3.12 + wheel-sanity
 ├── Dockerfile                # all-in-one: bathys + нативный SearXNG + chromium
-└── CHANGELOG.md              # история выпусков v0.1 → v0.5
+└── CHANGELOG.md              # история выпусков v0.1 → v0.7.2
 ```
 
 ## Куда смотреть по задаче
@@ -85,6 +85,7 @@ docs/
 | Посмотреть живые сценарии и научить харнесс эффективной работе | [cases.md](getting-started/cases.md) |
 | Поднятый бэкенд не отвечает, чистить кэш | [runbook.md](operations/runbook.md) |
 | Проверить стек одним запуском (`bathys-doctor`) | [runbook.md](operations/runbook.md) |
+| Снять Bathys с харнессов или снести целиком | [runbook.md](operations/runbook.md) |
 | Сверить цифру экономии | [metrics.md](operations/metrics.md) |
 | Понять, почему ответ такой короткий | [pipeline.md](architecture/pipeline.md) |
 | Добавить инструмент или модуль | [overview.md](architecture/overview.md), [style-guide.md](meta/style-guide.md) |
