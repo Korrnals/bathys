@@ -188,6 +188,16 @@ Bathys — stdio MCP-сервер: блок `mcpServers` один и тот же
 
 Репозиторий: `github.com/Korrnals/bathys`. Пакет опубликован: [PyPI `bathys`](https://pypi.org/project/bathys/) (pip install), однострочник установки — выше. До 1.0: публикация npm-обёртки `bathys-mcp` и первый прогон Docker-образа; CI (matrix 3.10–3.12 + shellcheck) уже в репозитории.
 
+## 🙏 Благодарности
+
+Bathys стоит на плечах выдающихся открытых проектов — спасибо их авторам и сообществам:
+
+- **[SearXNG](https://github.com/searxng/searxng)** — движок метапоиска (AGPL-3.0): Bathys запускает его как отдельный процесс и говорит с ним по локальному JSON API; исходники не модифицируются и не распространяются внутри пакета.
+- **[Crawl4AI](https://github.com/unclecode/crawl4ai)** — браузерный ярус извлечения (Apache-2.0).
+- **[MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk)** (MIT), **[httpx](https://www.python-httpx.org/)** (BSD-3), **[Playwright](https://playwright.dev/python/)** (Apache-2.0).
+
+Полные атрибуции и условия использования каждого компонента — в [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
 ## ⚖️ Лицензия
 
-[MIT](LICENSE) — см. поле `license` в `pyproject.toml`.
+Код Bathys — [MIT](LICENSE). Компоненты, которые Bathys устанавливает и использует, лицензированы отдельно и перечислены в [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) (в частности, SearXNG — под AGPL-3.0, с соблюдением её условий).
