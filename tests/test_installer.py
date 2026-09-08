@@ -43,10 +43,23 @@ class InstallerTmpTest(unittest.TestCase):
         self.tmp = Path(td.name)
 
     def set_targets(self, **targets):
-        """Replace _HARNESS_TARGETS entirely: name -> (path, dotpath, fmt)."""
-        ctx = mock.patch.dict(installer._HARNESS_TARGETS, targets, clear=True)
+        """Replace the WHOLE harness registry: patch every source the
+        installer consults (_HARNESS_TARGETS, cline family, yaml family)."""
+        cline = {n: t for n, t in targets.items() if t[2] == "cline"}
+        yaml = {n: t for n, t in targets.items() if t[2] in ("goose", "hermes")}
+        rest = {n: t for n, t in targets.items()
+                if n not in cline and n not in yaml}
+        self._clines = cline
+        self._yamls = yaml
+        ctx = mock.patch.dict(installer._HARNESS_TARGETS, rest, clear=True)
         ctx.start()
         self.addCleanup(ctx.stop)
+        if cline:
+            c = mock.patch.object(installer, "_cline_targets", return_value=cline)
+            c.start(); self.addCleanup(c.stop)
+        if yaml:
+            y = mock.patch.object(installer, "_yaml_targets", return_value=yaml)
+            y.start(); self.addCleanup(y.stop)
 
     def patch_home(self):
         """Point installer._HOME at the sandbox (agent destination)."""
@@ -291,24 +304,47 @@ class InstallDryRunTest(InstallerTmpTest):
 class InstallPrintConfigTest(InstallerTmpTest):
     """install(print_config=True): both snippets, no per-target records."""
 
-    def test_print_config_emits_both_formats_without_touching_files(self):
-        self.set_targets()  # detection must not matter for --print-config
+    def test_print_config_emits_all_formats_without_touching_files(self):
+        # print_config walks the WHOLE registry: substitute every family so the
+        # output is deterministic regardless of the host machine.
+        self.set_targets(
+            zcode=(self.tmp / "z.json", "mcp.servers", "zcode"),
+            **{"claude-code": (self.tmp / "c.json", "mcpServers", "openai"),
+               "gemini-cli": (self.tmp / "g.json", "mcpServers", "openai"),
+               "windsurf": (self.tmp / "w.json", "mcpServers", "openai"),
+               "zed": (self.tmp / "zset.json", "context_servers", "openai"),
+               "opencode": (self.tmp / "oc.json", "mcp", "opencode"),
+               "goose": (self.tmp / "goose.yaml", "extensions", "goose"),
+               "hermes": (self.tmp / "hermes.yaml", "mcp_servers", "hermes"),
+               "cline": (self.tmp / "cline.json", "mcpServers", "cline")},
+        )
 
         rc, out = self.run_install(print_config=True, searxng_home="/x")
 
         self.assertEqual(rc, 0)
-        self.assertIn("mcpServers", out)
-        self.assertIn("mcp.servers", out)
         for marker in ("[OK]", "[=]", "[SKIP]", "[DRY]"):
             self.assertNotIn(marker, out)
-        # First block is the generic mcpServers snippet, parseable JSON.
-        generic = json.loads(out[: out.index("# zcode")])
-        self.assertEqual(generic["mcpServers"]["bathys"],
-                         installer._server_entry("openai", "/x"))
-        # Second block is the zcode mcp.servers snippet.
-        tail = out[out.index("# zcode"):]
-        zcode = json.loads(tail[tail.index("\n") + 1:])
-        self.assertEqual(zcode, {"bathys": installer._server_entry("zcode", "/x")})
+        # Every harness family is present with its root key spelled out.
+        self.assertIn("## zcode", out)          # nested mcp -> servers JSON
+        self.assertIn("## claude-code", out)     # mcpServers
+        self.assertIn("## gemini-cli", out)      # mcpServers
+        self.assertIn("## windsurf", out)        # mcpServers
+        self.assertIn("## zed", out)             # context_servers
+        self.assertIn("## opencode", out)       # mcp (local command list)
+        self.assertIn("## goose", out)          # YAML extensions
+        self.assertIn("## hermes", out)          # YAML mcp_servers
+        self.assertIn("## cline", out)           # VS Code globalStorage family
+        self.assertIn("extensions:\n  bathys:", out)
+        self.assertIn("mcp_servers:\n  bathys:", out)
+        # zcode snippet nests servers under mcp and is parseable JSON.
+        tail = out[out.index("## zcode"):]
+        nxt = tail.index("\n\n## ", 1) if "\n\n## " in tail[1:] else len(tail)
+        snippet = tail[tail.index("{"):tail.rindex("}", 0, nxt) + 1]
+        zcode = json.loads(snippet)
+        self.assertIn("servers", zcode.get("mcp", {}))
+        self.assertIn("bathys", zcode["mcp"]["servers"])
+        # Pi is explicitly routed to the drop-in, not a config file.
+        self.assertIn("Pi", out)
         self.assertEqual(list(self.tmp.iterdir()), [])
 
 

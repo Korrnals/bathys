@@ -1,13 +1,24 @@
 """`bathys install` — native, idempotent one-command harness integration.
 
-Detects installed harnesses by their standard config paths, registers the
-MCP server there, and (optionally) copies the researcher subagent profile.
+Detects installed harnesses by their standard config paths and registers the
+MCP server there. Two config contours are supported:
+
+  * JSON — zcode, Claude Code/Desktop, Cursor, VS Code, Gemini CLI,
+    Cline/Roo/Kilo Code, Windsurf, opencode (each with its own schema);
+  * YAML — goose (`extensions` block) and hermes (`mcp_servers` block),
+    handled with a minimal built-in emitter/parser that preserves the rest
+    of the document as opaque text (no yaml dependency in core).
+
+Pi (badlogic pi-mono) has no MCP config file: integrations are TypeScript
+extensions. Bathys ships the harness drop-in for that path instead
+(agents/HARNESS-DROPIN.md -> AGENTS.md), and `install` never writes to Pi.
+
 Base directories follow platform conventions by default (see config.py):
 data ~/.local/share/bathys, cache ~/.cache/bathys — overridable by env.
 
-Manual wiring is always available: `bathys install --print-config` emits the
-snippet to paste by hand. Every automatic write is preceded by a timestamped
-backup and is idempotent — re-running updates in place.
+Manual wiring is always available: `bathys install --print-config` emits
+snippets for every supported harness. Every automatic write is preceded by a
+timestamped backup and is idempotent — re-running updates in place.
 
 Exit codes: 0 = at least one target updated (or nothing to do), 1 = failure.
 """
@@ -25,8 +36,29 @@ from pathlib import Path
 _HOME = Path.home()
 _PKG_DIR = Path(__file__).resolve().parent
 
-# Harness id -> (config path, dotpath to the servers dict, per-entry format).
-# format: "zcode" uses {type, command, args, env}; others use {command, env}.
+# VS Code-family globalStorage lives under different roots per platform.
+_VSCODE_GLOBAL = {
+    "linux": _HOME / ".config" / "Code" / "User" / "globalStorage",
+    "darwin": _HOME / "Library" / "Application Support" / "Code" / "User" / "globalStorage",
+}
+
+
+def _vscode_globalstorage() -> Path | None:
+    import platform
+
+    return _VSCODE_GLOBAL.get(platform.system().lower())
+
+
+# name -> (config path, dotpath to servers/root, entry format)
+# Formats:
+#   zcode    {type:stdio, command, args, env}
+#   openai   {command, env}                      (claude-code, claude-desktop,
+#                                               cursor, gemini, windsurf)
+#   vscode   {command, args, env} under "servers"
+#   cline    {command, args, env, disabled:false} under mcpServers
+#   opencode {type:local, command:[...], enabled, environment}
+#   goose    YAML extensions.<name> {type:stdio, cmd, args, envs, enabled}
+#   hermes   YAML mcp_servers.<name> {command, args, env}
 _HARNESS_TARGETS: dict[str, tuple[Path, str, str]] = {
     "zcode": (_HOME / ".zcode" / "cli" / "config.json", "mcp.servers", "zcode"),
     "claude-code": (_HOME / ".claude.json", "mcpServers", "openai"),
@@ -35,7 +67,34 @@ _HARNESS_TARGETS: dict[str, tuple[Path, str, str]] = {
         _HOME / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json",
         "mcpServers", "openai",
     ),
+    "gemini-cli": (_HOME / ".gemini" / "settings.json", "mcpServers", "openai"),
+    "windsurf": (_HOME / ".codeium" / "windsurf" / "mcp_config.json", "mcpServers", "openai"),
+    "zed": (_HOME / ".config" / "zed" / "settings.json", "context_servers", "openai"),
+    "opencode": (_HOME / ".config" / "opencode" / "opencode.json", "mcp", "opencode"),
 }
+
+
+def _cline_targets() -> dict[str, tuple[Path, str, str]]:
+    """Cline-family: each variant keeps its own file inside VS Code globalStorage."""
+    base = _vscode_globalstorage()
+    if base is None:
+        return {}
+    variants = {
+        "cline": "saoudrizwan.claude-dev/settings/cline_mcp_settings.json",
+        "roo-code": "rooveterinaryinc.roo-cline/settings/roo_mcp_settings.json",
+        "kilo-code": "kilocode.kilo-Code/settings/kilo_mcp_settings.json",
+    }
+    return {
+        name: (base / rel, "mcpServers", "cline")
+        for name, rel in variants.items()
+    }
+
+
+def _yaml_targets() -> dict[str, tuple[Path, str, str]]:
+    return {
+        "goose": (_HOME / ".config" / "goose" / "config.yaml", "extensions", "goose"),
+        "hermes": (_HOME / ".hermes" / "config.yaml", "mcp_servers", "hermes"),
+    }
 
 
 def _bathys_command() -> str:
@@ -48,18 +107,120 @@ def _bathys_command() -> str:
 
 
 def _server_entry(fmt: str, searxng_home: str | None) -> dict:
-    entry: dict = {}
-    if fmt == "zcode":
-        entry = {"type": "stdio", "command": _bathys_command(), "args": []}
-    else:
-        entry = {"command": _bathys_command()}
+    cmd = _bathys_command()
     env: dict[str, str] = {}
     if searxng_home:
         env["BATHYS_SEARXNG_HOME"] = searxng_home
-    if env:
+    if fmt == "zcode":
+        entry = {"type": "stdio", "command": cmd, "args": []}
+    elif fmt == "vscode":
+        entry = {"type": "stdio", "command": cmd, "args": []}
+    elif fmt == "cline":
+        entry = {"command": cmd, "args": [], "disabled": False}
+    elif fmt == "opencode":
+        entry = {"type": "local", "command": [cmd], "enabled": True}
+    else:  # openai, and the JSON-shaped part of yaml formats
+        entry = {"command": cmd}
+    if fmt == "opencode":
+        if env:
+            entry["environment"] = env
+    elif env:
         entry["env"] = env
     return entry
 
+
+# ---------------------------------------------------------------- YAML ----
+# Minimal, dependency-free contour for goose/hermes: read the target block as
+# plain text, replace/append our entry, keep everything else byte-identical.
+_YAML_BLOCK_HDR = re.compile(r"^([A-Za-z_][\w-]*):\s*$")
+
+
+def _yaml_set(text: str, root: str, name: str, entry_lines: list[str],
+              fmt: str) -> str:
+    """Set root.<name> in a flat-roots YAML document (goose/hermes style)."""
+    lines = text.splitlines()
+    root_start = None
+    for i, ln in enumerate(lines):
+        m = _YAML_BLOCK_HDR.match(ln)
+        if m and m.group(1) == root:
+            root_start = i
+            break
+    indented = ["    " + l for l in entry_lines]  # 4 spaces: inside <name>:
+    block = [f"  {name}:"] + indented
+    if root_start is None:
+        # append a new root at the end of the document, entry named inside
+        sep = [""] if text and not text.endswith("\n\n") else []
+        new_block = [f"{root}:"] + block
+        return text.rstrip("\n") + "\n" + "\n".join(sep + new_block) + "\n"
+    # find the end of the root block (next top-level key)
+    root_end = len(lines)
+    for j in range(root_start + 1, len(lines)):
+        if lines[j] and not lines[0].startswith(" ") and _YAML_BLOCK_HDR.match(lines[j]):
+            root_end = j
+            break
+        if lines[j] and not lines[j].startswith((" ", "\t", "-", "#")) and ":" in lines[j]:
+            root_end = j
+            break
+    # existing entry?
+    entry_pat = re.compile(rf"^  {re.escape(name)}:\s*(#.*)?$")
+    for j in range(root_start + 1, root_end):
+        if entry_pat.match(lines[j]):
+            # replace from entry line to the next sibling (2-space indent)
+            k = j + 1
+            while k < root_end and (lines[k].startswith("    ") or not lines[k].strip()):
+                k += 1
+            lines[j:k] = block
+            return "\n".join(lines) + "\n"
+    # insert at the end of the root block
+    insert_at = root_end
+    lines[insert_at:insert_at] = block
+    return "\n".join(lines) + "\n"
+
+
+def _yaml_entry_lines(fmt: str, searxng_home: str | None) -> list[str]:
+    cmd = _bathys_command()
+    if fmt == "goose":
+        lines = ["type: stdio", "name: bathys", "enabled: true",
+                 f'cmd: "{cmd}"', "args: []", "envs: {}"]
+        if searxng_home:
+            lines[-1] = "envs:"
+            lines.append(f'  BATHYS_SEARXNG_HOME: "{searxng_home}"')
+        return lines
+    # hermes
+    lines = [f'command: "{cmd}"', "args: []", "env: {}"]
+    if searxng_home:
+        lines[-1] = "env:"
+        lines.append(f'  BATHYS_SEARXNG_HOME: "{searxng_home}"')
+    return lines
+
+
+def _yaml_current_ok(text: str, root: str, name: str, fmt: str,
+                    searxng_home: str | None) -> bool:
+    """True when root.<name> equals the desired entry block exactly."""
+    desired_lines = _yaml_entry_lines(fmt, searxng_home)
+    lines = text.splitlines()
+    in_root = False
+    i = 0
+    while i < len(lines):
+        ln = lines[i]
+        m = _YAML_BLOCK_HDR.match(ln)
+        if m and m.group(1) == root:
+            in_root = True
+        elif m and in_root:
+            in_root = False
+        if in_root and re.match(rf"^  {re.escape(name)}:\s*(#.*)?$", ln):
+            got = []
+            j = i + 1
+            while j < len(lines) and (not lines[j].strip() or lines[j].startswith("    ")):
+                if lines[j].strip():
+                    got.append(lines[j].strip())
+                j += 1
+            return [g.strip() for g in got] == [d.strip() for d in desired_lines]
+        i += 1
+    return False
+
+
+# --------------------------------------------------------------- shared ----
 
 def _get_by_path(obj: object, dotpath: str) -> dict | None:
     cur: object = obj
@@ -89,20 +250,25 @@ def _backup(path: Path) -> Path | None:
 def _entry_needs_update(existing: dict, desired: dict) -> bool:
     if not isinstance(existing, dict):
         return True
-    for key in ("command", "type"):
+    for key in ("command", "type", "cmd"):
         if key in desired and existing.get(key) != desired[key]:
             return True
-    old_env = existing.get("env") or {}
-    new_env = desired.get("env") or {}
+    old_env = existing.get("env") or existing.get("environment") or existing.get("envs") or {}
+    new_env = desired.get("env") or desired.get("environment") or desired.get("envs") or {}
     return any(new_env[k] != old_env.get(k) for k in new_env)
+
+
+def _all_targets() -> dict[str, tuple[Path, str, str]]:
+    t = dict(_HARNESS_TARGETS)
+    t.update(_cline_targets())
+    t.update(_yaml_targets())
+    return t
 
 
 def _agent_src() -> Path | None:
     """Locate agents/bathys-researcher.md: repo root (editable install),
     packaged copy (wheel force-include), or CWD (running from a clone)."""
     name = Path("agents") / "bathys-researcher.md"
-    # repo layout: <repo>/src/bathys/installer.py -> agents sits at <repo>/agents;
-    # wheel layout: agents is force-included INTO the package -> <pkg>/agents.
     pkg_dir = _PKG_DIR  # .../src/bathys or site-packages/bathys
     for base in (pkg_dir.parent.parent, pkg_dir, Path.cwd()):
         cand = base / name
@@ -112,35 +278,58 @@ def _agent_src() -> Path | None:
 
 
 def install(dry_run: bool, print_config: bool, with_agent: bool,
-            searxng_home: str | None) -> int:
-    desired_env = {"BATHYS_SEARXNG_HOME": searxng_home} if searxng_home else None
+            searxng_home: str | None,
+            _targets: dict[str, tuple[Path, str, str]] | None = None) -> int:
+    """_targets exists for tests: a full harness registry to substitute
+    (detection paths are machine-specific). Production callers omit it."""
+    all_targets = dict(_targets) if _targets is not None else _all_targets()
     if print_config:
-        print(json.dumps({"mcpServers": {"bathys": _server_entry("openai", searxng_home)}},
-                         indent=2, ensure_ascii=False))
-        print("# zcode (~/.zcode/cli/config.json → mcp.servers):")
-        print(json.dumps({"bathys": _server_entry("zcode", searxng_home)},
-                         indent=2, ensure_ascii=False))
+        print("# Bathys — блоки для ручного подключения\n")
+        for name, (path, dotpath, fmt) in _all_targets().items():
+            print(f"## {name} — {path}")
+            if fmt in ("goose", "hermes"):
+                lines = _yaml_entry_lines(fmt, searxng_home)
+                print(f"{dotpath}:")
+                print("  bathys:")
+                print("\n".join("    " + l for l in lines))
+            else:
+                # nest the snippet under the full dotpath (e.g. mcp.servers)
+                snippet: dict = {"bathys": _server_entry(fmt, searxng_home)}
+                for part in reversed(dotpath.split(".")):
+                    snippet = {part: snippet}
+                print(json.dumps(snippet, indent=2, ensure_ascii=False))
+            print()
+        print("# Pi (badlogic pi-mono) не имеет MCP-конфига: вставьте дроп-ин "
+              "agents/HARNESS-DROPIN.md в AGENTS.md проекта.")
         return 0
 
-    targets: list[tuple[str, Path, dict]] = []
-    for name, (path, dotpath, fmt) in _HARNESS_TARGETS.items():
-        if path.is_file():
-            targets.append((name, path, _server_entry(fmt, searxng_home)))
-    if not targets:
+    json_targets = {n: t for n, t in all_targets.items() if t[2] not in ("goose", "hermes")}
+    yaml_targets = {n: t for n, t in all_targets.items() if t[2] in ("goose", "hermes")}
+
+    found_json = {n: t for n, t in json_targets.items() if t[0].is_file()}
+    found_yaml = {n: t for n, t in yaml_targets.items() if t[0].is_file()}
+    found_zed_dir = (_HOME / ".config" / "zed").is_dir()
+    if found_zed_dir and "zed" not in found_json:
+        # Zed commonly has no settings.json yet — creating it is safe: it is
+        # user-editable and Zed merges defaults for missing keys.
+        found_json["zed"] = json_targets["zed"]
+
+    if not found_json and not found_yaml:
         print("Харнессы не найдены по стандартным путям. Ручное подключение:")
         print("  bathys install --print-config   # готовые блоки для вставки")
         return 0
 
-    updated, skipped = [], []
-    for name, path, desired in targets:
-        _, dotpath, _ = _HARNESS_TARGETS[name]
+    updated: list[str] = []
+    skipped: list[str] = []
+
+    for name, (path, dotpath, fmt) in found_json.items():
+        desired = _server_entry(fmt, searxng_home)
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError) as e:
             print(f"[SKIP] {name}: {path} не читается ({e.__class__.__name__})")
             continue
-        servers = _get_by_path(data, dotpath)
-        current = (servers or {}).get("bathys")
+        current = (_get_by_path(data, dotpath) or {}).get("bathys")
         if current == desired or not _entry_needs_update(current or {}, desired):
             skipped.append(name)
             continue
@@ -156,6 +345,25 @@ def install(dry_run: bool, print_config: bool, with_agent: bool,
         print(f"[OK] {name}: bathys прописан в {path}{note}")
         updated.append(name)
 
+    for name, (path, dotpath, fmt) in found_yaml.items():
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError as e:
+            print(f"[SKIP] {name}: {path} не читается ({e.__class__.__name__})")
+            continue
+        if _yaml_current_ok(text, dotpath, "bathys", fmt, searxng_home):
+            skipped.append(name)
+            continue
+        if dry_run:
+            updated.append(name)
+            continue
+        bkp = _backup(path)
+        new_text = _yaml_set(text, dotpath, "bathys", _yaml_entry_lines(fmt, searxng_home), fmt)
+        path.write_text(new_text, encoding="utf-8")
+        note = f" (бэкап: {bkp.name})" if bkp else ""
+        print(f"[OK] {name}: bathys прописан в {path}{note}")
+        updated.append(name)
+
     for name in skipped:
         print(f"[=] {name}: уже актуален, не тронут")
 
@@ -166,14 +374,13 @@ def install(dry_run: bool, print_config: bool, with_agent: bool,
         else:
             dst_dirs = {
                 "zcode": _HOME / ".zcode" / "agents",
-                "claude-code": Path.cwd() / ".claude" / "agents",
+                "claude-code": _HOME / ".claude" / "agents",
+                "goose": _HOME / ".config" / "goose" / "agents",
+                "hermes": _HOME / ".hermes" / "agents",
             }
             copied = False
             for harness, dst in dst_dirs.items():
-                parent = dst.parent
-                wants = harness == "zcode" or parent.exists() or (
-                    harness == "claude-code" and (parent.parent / ".claude.json").exists())
-                if wants:
+                if harness in ("zcode",) or dst.parent.exists():
                     if dry_run:
                         print(f"[DRY] агент → {dst}")
                         copied = True
@@ -197,8 +404,10 @@ def install(dry_run: bool, print_config: bool, with_agent: bool,
 def main() -> None:
     ap = argparse.ArgumentParser(
         prog="bathys install",
-        description="Нативная интеграция Bathys в харнессы: автодетект конфигов, "
-                    "идемпотентная запись с бэкапом, опциональный субагент.")
+        description="Нативная интеграция Bathys в харнессы: автодетект конфигов "
+                    "(zcode, Claude, Cursor, VS Code/Cline/Roo/Kilo, Gemini CLI, "
+                    "Windsurf, Zed, opencode, goose, hermes), идемпотентная запись "
+                    "с бэкапом, опциональный субагент.")
     ap.add_argument("--dry-run", action="store_true", help="показать план без записи")
     ap.add_argument("--print-config", action="store_true",
                     help="напечатать блоки для ручного подключения и выйти")

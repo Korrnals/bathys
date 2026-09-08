@@ -63,11 +63,13 @@ curl -sS https://bootstrap.pypa.io/get-pip.py | .venv/bin/python
 
 Что делает команда:
 
-- ищет харнессы по стандартным путям — `~/.zcode/cli/config.json` (zcode), `~/.claude.json` (Claude Code), `~/.cursor/mcp.json` (Cursor), `~/Library/Application Support/Claude/claude_desktop_config.json` (Claude Desktop);
+- ищет харнессы по стандартным путям: zcode (`~/.zcode/cli/config.json`), Claude Code (`~/.claude.json`), Claude Desktop, Cursor (`~/.cursor/mcp.json`), VS Code-семейство — Cline / Roo Code / Kilo Code (globalStorage `mcp_settings.json`), Gemini CLI (`~/.gemini/settings.json`), Windsurf (`~/.codeium/windsurf/mcp_config.json`), Zed (`~/.config/zed/settings.json`, `context_servers`), opencode (`~/.config/opencode/opencode.json`), goose (`~/.config/goose/config.yaml`, секция `extensions`), Hermes (`~/.hermes/config.yaml`, секция `mcp_servers`);
 - идемпотентно прописывает сервер `bathys` в найденный конфиг: перед записью создаёт бэкап с таймстампом, повторный запуск не трогает актуальное;
 - `--searxng-home <путь>` дополнительно пишет `BATHYS_SEARXNG_HOME` в env сервера;
 - `--with-agent` копирует субагента `bathys-researcher` в каталог харнесса;
-- ничего не находит — печатает подсказку про ручной путь.
+- ничего не находит — печатает подсказку про ручной путь;
+- форматы различаются автоматически: JSON-схемы (openai/zcode/vscode/cline/opencode) и YAML-контуры goose/hermes — правки точечные, остальной документ конфига не трогается;
+- Pi (badlogic pi-mono) MCP-конфига не имеет — для него работает дроп-ин [`agents/HARNESS-DROPIN.md`](../../agents/HARNESS-DROPIN.md) в `AGENTS.md` проекта.
 
 После установки перезапустите харнесс — сервер поднимется при первом вызове вместе с бэкендом.
 

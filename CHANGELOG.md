@@ -2,6 +2,21 @@
 
 Формат: Keep a Changelog; версии — semver. Дата — дата выпуска версии.
 
+## [0.6.1] — 2026-09-08
+
+Расширение автодетекта `bathys install` на базовый набор харнессов (форматы подтверждены первоисточниками каждого клиента).
+
+### Добавлено
+
+- **Новые таргеты инсталлера**: VS Code-семейство — Cline / Roo Code / Kilo Code (`mcp_settings.json` в globalStorage, записи cline-формата), Gemini CLI (`~/.gemini/settings.json` → `mcpServers`), Windsurf (`~/.codeium/windsurf/mcp_config.json`), Zed (`~/.config/zed/settings.json` → `context_servers`; файл создаётся, если каталог есть), opencode (`~/.config/opencode/opencode.json` → `mcp` c `command`-массивом), goose (`~/.config/goose/config.yaml` → `extensions`, stdio-поля `cmd/args/envs`), Hermes (`~/.hermes/config.yaml` → `mcp_servers`).
+- **YAML-контур без зависимостей**: идемпотентные правки `extensions`/`mcp_servers` с сохранением остального документа байт-в-байт (append/insert/replace покрыты тестами).
+- `--print-config` печатает блоки для каждого харнесса в его собственном формате (вложенность `mcp.servers` для zcode, YAML для goose/hermes); Pi (badlogic pi-mono) честно маршрутизируется на дроп-ин — MCP-конфига у него нет.
+- `install()` принимает `_targets` (инъекция реестра для тестов).
+
+### Изменено
+
+- Тест-хелпер `set_targets` подменяет все три источника реестра (базовый, cline-семья, YAML-семья); `print-config`-тест использует полный фикстурный набор. Сьют: 102 OK.
+
 ## [0.6.0] — 2026-09-08
 
 Тема: «Native Install» — нативная автоматическая интеграция в харнессы одним вызовом.
