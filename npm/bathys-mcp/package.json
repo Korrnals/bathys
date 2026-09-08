@@ -1,6 +1,6 @@
 {
   "name": "bathys-mcp",
-  "version": "0.6.2",
+  "version": "0.7.2",
   "description": "Unified local deep-research search service for AI agents — one pipeline (search → extraction → query distillation → cache), zero cloud quotas. MCP stdio server with native harness integration.",
   "license": "MIT",
   "repository": {
