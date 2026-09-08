@@ -7,21 +7,29 @@
 Сонар находит координаты, батискаф ныряет за полными текстами, дистиллятор поднимает на палубу только то, что отвечает на вопрос.
 
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
-![version](https://img.shields.io/badge/version-0.7.0-9cf)
+![version](https://img.shields.io/badge/version-0.7.1-9cf)
 ![mcp](https://img.shields.io/badge/MCP-stdio%20server-6f42c1)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
 ## ⚡ Quick start
 
-Три команды от чистой системы до работающего поиска (Python ≥ 3.10):
+**Одной командой** (Python ≥ 3.10; приватный venv, без sudo, идемпотентно):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Korrnals/bathys/main/install.sh | bash
+```
+
+Скрипт ставит пакет с PyPI в `~/.local/share/bathys/venv`, прописывает PATH, запускает `bathys setup` (браузер для JS-страниц → все найденные харнессы → субагент) и финальный `bathys-doctor`. Повторный запуск — безопасное обновление.
+
+**Без скрипта** (то же самое вручную, для тех кто предпочитает pip):
 
 ```bash
 pip install bathys     # пакет: сервер + bathys setup/install/doctor
-bathys setup          # браузер для JS-страниц → все найденные харнессы → субагент
+bathys setup          # браузер → харнессы → субагент
 bathys doctor         # самодиагностика стека
 ```
 
-`setup` идемпотентен — повторный запуск ничего не ломает. SearXNG ставить руками не нужно: бэкенд поднимется сам при первом поиске (внешний инстанс → docker → нативный режим). Браузер нужен только для JS-страниц: обычные страницы Bathys читает собственным HTTP-движком, `BATHYS_BROWSER=off` отключает браузерный ярус полностью.
+SearXNG ставить руками не нужно: бэкенд поднимется сам при первом поиске (внешний инстанс → docker → нативный режим). Браузер нужен только для JS-страниц: обычные страницы Bathys читает собственным HTTP-движком, `BATHYS_BROWSER=off` отключает браузерный ярус полностью.
 
 <details>
 <summary><b>Альтернативные пути установки</b> (npm, исходники, минимальные образы)</summary>
@@ -154,7 +162,7 @@ docs/
 
 ## 📍 Статус
 
-**0.7.0.** Выпускная история: v0.2 «Качество выдачи» (ретраи, здоровье движков), v0.3 «Паритет с Tavily» (`read_urls`, JSON-режим), v0.4 «Эксплуатация» (robots-этика, метрики, `bathys-doctor`), v0.5 «Identity & Harness» (репозиционирование, промпты, субагент), v0.6 «Native Install» (`bathys install`) — итоги в [CHANGELOG.md](CHANGELOG.md).
+**0.7.1.** Выпускная история: v0.2 «Качество выдачи» (ретраи, здоровье движков), v0.3 «Паритет с Tavily» (`read_urls`, JSON-режим), v0.4 «Эксплуатация» (robots-этика, метрики, `bathys-doctor`), v0.5 «Identity & Harness» (репозиционирование, промпты, субагент), v0.6 «Native Install» (`bathys install`) — итоги в [CHANGELOG.md](CHANGELOG.md).
 
 Репозиторий: `github.com/Korrnals/bathys`. До 1.0 остаются публикация пакета `bathys` на PyPI (имя свободно, публикация планируется к 1.0) и первый прогон Docker-образа; CI с matrix 3.10–3.12 уже в репозитории.
 
