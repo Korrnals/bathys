@@ -2,6 +2,20 @@
 
 Формат: Keep a Changelog; версии — semver. Дата — дата выпуска версии.
 
+## [0.6.2] — 2026-09-08
+
+Публикационная волна: PyPI + NPM + кастомные интеграции.
+
+### Добавлено
+
+- **Каталог `integrations/`** — кастомные интеграции с конвенцией (README-установщик-assets): `hermes/` (установщик `install.py`: создаёт `~/.hermes/config.yaml` с `mcp_servers.bathys`, ставит субагента; идемпотентен, бэкап; ловит и чинит артефакт старой установки), `pi/` (дроп-ин `assets/bathys-rules.md` для `AGENTS.md` — у Pi нет MCP-конфига), `zcode/` (комплект: конфиг + субагент + скиллы + дроп-ин).
+- **NPM-обёртка `bathys-mcp`** (`npm/bathys-mcp/`): тонкий установщик для Node-first пользователей — postinstall ставит Python-пакет (`pip install bathys`), CLI делегирует `bathys install|doctor|--help` и запускает stdio-сервер; проверена на node v20 (install --dry-run, print-config, doctor — зелёные). Публикуется на NPM как `bathys-mcp`.
+- **Живые интеграции на машине мейнтейнера**: Hermes — `config.yaml` + субагент установлены идемпотентно.
+
+### Изменено
+
+- **Метаданные пакета** (PyPI-витрина): `description` переведён на канон продукта («Unified local deep-research search service…», вместо обёрточной формулировки про SearXNG/Crawl4AI); добавлены `keywords` (mcp, deep-research, local-first…), `classifiers`, секция `[project.urls]` (Homepage/Repository/Changelog/Documentation).
+
 ## [0.6.1] — 2026-09-08
 
 Расширение автодетекта `bathys install` на базовый набор харнессов (форматы подтверждены первоисточниками каждого клиента).

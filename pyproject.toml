@@ -4,8 +4,21 @@ build-backend = "hatchling.build"
 
 [project]
 name = "bathys"
-version = "0.6.1"
-description = "Deep-research MCP server: SearXNG metasearch + Crawl4AI extraction, distilled to LLM-lean output"
+version = "0.6.2"
+description = "Unified local deep-research search service for AI agents — one pipeline (search → extraction → query distillation → cache), zero cloud quotas. MCP stdio server with native harness integration (bathys install)."
+keywords = ["mcp", "deep-research", "search", "web-search", "ai-agents", "llm", "local-first", "distillation", "searxng", "crawl4ai"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Internet :: WWW/HTTP :: Indexing/Search",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -14,6 +27,12 @@ dependencies = [
     "httpx>=0.27",
     "crawl4ai>=0.6.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Korrnals/bathys"
+Repository = "https://github.com/Korrnals/bathys"
+Changelog = "https://github.com/Korrnals/bathys/blob/main/CHANGELOG.md"
+Documentation = "https://github.com/Korrnals/bathys/tree/main/docs"
 
 [project.scripts]
 bathys = "bathys.server:main"

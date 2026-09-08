@@ -1,0 +1,35 @@
+{
+  "name": "bathys-mcp",
+  "version": "0.6.2",
+  "description": "Unified local deep-research search service for AI agents — one pipeline (search → extraction → query distillation → cache), zero cloud quotas. MCP stdio server with native harness integration.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Korrnals/bathys"
+  },
+  "homepage": "https://github.com/Korrnals/bathys",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "deep-research",
+    "search",
+    "web-search",
+    "ai-agents",
+    "llm",
+    "local-first"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "README.md",
+    "bin/"
+  ],
+  "bin": {
+    "bathys-mcp": "bin/cli.js",
+    "bathys-install": "bin/cli.js"
+  },
+  "scripts": {
+    "postinstall": "node bin/postinstall.js"
+  }
+}

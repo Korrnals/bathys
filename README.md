@@ -7,21 +7,35 @@
 Сонар находит координаты, батискаф ныряет за полными текстами, дистиллятор поднимает на палубу только то, что отвечает на вопрос.
 
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
-![version](https://img.shields.io/badge/version-0.6.1-9cf)
+![version](https://img.shields.io/badge/version-0.6.2-9cf)
 ![mcp](https://img.shields.io/badge/MCP-stdio%20server-6f42c1)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
 ## ⚡ Quick start
 
-Нужны Python ≥ 3.10 и `git`. В каталоге проекта:
+**Из PyPI** (основной путь — Python ≥ 3.10):
+
+```bash
+pip install bathys                        # сервер + команды bathys/bathys-doctor
+python -m playwright install chromium     # браузер для извлечения
+bathys install                            # автоподключение к найденным харнессам
+bathys-doctor                             # диагностика стека одним запуском
+```
+
+**Из npm** (для Node-first окружений — обёртка ставит Python-пакет сама):
+
+```bash
+npm install -g bathys-mcp
+bathys-mcp install
+```
+
+**Из исходников** (разработка):
 
 ```bash
 git clone https://github.com/Korrnals/bathys.git && cd bathys
-python3.12 -m venv .venv
-.venv/bin/pip install -e .
-.venv/bin/python -m playwright install chromium   # браузер для извлечения
-.venv/bin/python -m unittest discover -s tests    # 72 теста без сети, ~0.1 c
-.venv/bin/bathys-doctor                           # диагностика стека одним запуском
+python3.12 -m venv .venv && .venv/bin/pip install -e .
+.venv/bin/python -m playwright install chromium
+.venv/bin/python -m unittest discover -s tests    # юнит-тесты без сети, ~0.1 c
 ```
 
 В минимальном контейнерном образе без `ensurepip` venv собирается через `get-pip.py` — ветка в [docs/getting-started/install.md](docs/getting-started/install.md). SearXNG поднимать руками не нужно: при первом поиске сервер сам пробует внешний инстанс, затем docker/podman, затем нативный режим ([docs/getting-started/configure.md](docs/getting-started/configure.md)).
@@ -34,7 +48,7 @@ python3.12 -m venv .venv
 .venv/bin/bathys install            # сначала --dry-run, чтобы увидеть план
 ```
 
-Детектируются zcode, Claude Code, Claude Desktop, Cursor; повторный запуск ничего не меняет — запись идемпотентна. Поддерживаются `--print-config` (готовые блоки для ручной вставки) и `--searxng-home <путь>`.
+Детектируются zcode, Claude Code, Claude Desktop, Cursor, VS Code-семейство (Cline / Roo Code / Kilo Code), Gemini CLI, Windsurf, Zed, opencode, goose, Hermes; форматы каждого — свои (JSON-схемы и YAML-контуры goose/hermes), запись идемпотентна. Для Pi (badlogic pi-mono), у которого нет MCP-конфига, — дроп-ин в `AGENTS.md`. Поддерживаются `--print-config` (готовые блоки для ручной вставки) и `--searxng-home <путь>`; кастомные интеграции — в каталоге [integrations/](integrations/).
 
 **Вручную.** Bathys — stdio MCP-сервер, конфиг везде один и тот же блок `mcpServers`; от харнесса зависит только файл, в который его кладут. `command` — абсолютный путь к вашему клону (`~` внутри JSON не раскрывается); `BATHYS_SEARXNG_HOME` опциональна.
 
@@ -122,11 +136,11 @@ docs/
 └── meta/             # стайлгайд · глоссарий
 ```
 
-Вне `docs/`: [agents/](agents/) (субагент `bathys-researcher`, дроп-ин для харнессов) · [tests/](tests/) (72 юнит-теста без сети) · [scripts/](scripts/) (smoke, stdio_check, метрики) · [CHANGELOG.md](CHANGELOG.md).
+Вне `docs/`: [agents/](agents/) (субагент `bathys-researcher`, скиллы, дроп-ин для харнессов) · [integrations/](integrations/) (кастомные интеграции: hermes, pi, zcode) · [tests/](tests/) (юнит-тесты без сети) · [scripts/](scripts/) (smoke, stdio_check, метрики) · [npm/bathys-mcp/](npm/bathys-mcp/) (NPM-обёртка) · [CHANGELOG.md](CHANGELOG.md).
 
 ## 📍 Статус
 
-**0.6.1.** Выпускная история: v0.2 «Качество выдачи» (ретраи, здоровье движков), v0.3 «Паритет с Tavily» (`read_urls`, JSON-режим), v0.4 «Эксплуатация» (robots-этика, метрики, `bathys-doctor`), v0.5 «Identity & Harness» (репозиционирование, промпты, субагент), v0.6 «Native Install» (`bathys install`) — итоги в [CHANGELOG.md](CHANGELOG.md).
+**0.6.2.** Выпускная история: v0.2 «Качество выдачи» (ретраи, здоровье движков), v0.3 «Паритет с Tavily» (`read_urls`, JSON-режим), v0.4 «Эксплуатация» (robots-этика, метрики, `bathys-doctor`), v0.5 «Identity & Harness» (репозиционирование, промпты, субагент), v0.6 «Native Install» (`bathys install`) — итоги в [CHANGELOG.md](CHANGELOG.md).
 
 Репозиторий: `github.com/Korrnals/bathys`. До 1.0 остаются публикация пакета `bathys` на PyPI (имя свободно, публикация планируется к 1.0) и первый прогон Docker-образа; CI с matrix 3.10–3.12 уже в репозитории.
 
