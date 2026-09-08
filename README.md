@@ -11,34 +11,40 @@
 ![mcp](https://img.shields.io/badge/MCP-stdio%20server-6f42c1)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
-**Навигация:** [⚡ Quick start](#-quick-start) · [🔌 Подключение](#-подключение-к-харнессу) · [🧠 Научить агента](#-научить-агента-работать-эффективно) · [🧭 Кейсы](#-ходовые-кейсы) · [🛠 Инструменты](#-инструменты) · [📊 Экономия токенов](#-экономия-токенов) · [📚 Документация](#-документация) · [📍 Статус](#-статус)
+**Навигация:** [⚡ Quick start](#-quick-start) · [🧹 Удаление](#-удаление) · [🔌 Подключение](#-подключение-к-харнессу) · [🧠 Научить агента](#-научить-агента-работать-эффективно) · [🧭 Кейсы](#-ходовые-кейсы) · [🛠 Инструменты](#-инструменты) · [📊 Экономия токенов](#-экономия-токенов) · [📚 Документация](#-документация) · [📍 Статус](#-статус)
 
 ## ⚡ Quick start
 
-**Одной командой** (Python ≥ 3.10; приватный venv, без sudo, идемпотентно):
+**Вариант 1 — установочный скрипт** (рекомендуется; Python ≥ 3.10):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Korrnals/bathys/main/install.sh | bash
 ```
 
-Скрипт ставит пакет с PyPI в `~/.local/share/bathys/venv`, прописывает PATH, запускает `bathys setup` (браузер для JS-страниц → все найденные харнессы → субагент) и финальный `bathys-doctor`. Повторный запуск — безопасное обновление.
+Скрипт ставит пакет с PyPI в приватный venv (`~/.local/share/bathys/venv`, без sudo), добавляет его в `PATH` и запускает полную настройку. Повторный запуск — безопасное обновление.
 
-**Без скрипта** (то же самое вручную, для тех кто предпочитает pip):
+**Вариант 2 — pip** (то же самое вручную):
 
 ```bash
-pip install bathys     # пакет: сервер + bathys setup/install/doctor
-bathys setup          # браузер → харнессы → субагент
-bathys doctor         # самодиагностика стека
+pip install bathys
+bathys setup
 ```
 
-Откат на конкретную версию: `BATHYS_INSTALL_VERSION=0.7.0 bash install.sh`. Снятие Bathys с харнессов — `bathys uninstall` (точечно: `bathys uninstall hermes`; полный снос — `--purge`).
+Что делает `bathys setup`:
 
-SearXNG ставить руками не нужно: бэкенд поднимется сам при первом поиске (внешний инстанс → docker → нативный режим). Браузер нужен только для JS-страниц: обычные страницы Bathys читает собственным HTTP-движком, `BATHYS_BROWSER=off` отключает браузерный ярус полностью.
+| Шаг | Действие |
+|---|---|
+| 1 | ставит headless-браузер — нужен только для JS-страниц (обычные страницы читает встроенный HTTP-движок) |
+| 2 | прописывает MCP-сервер во все найденные харнессы (zcode, Claude, Cursor, VS Code-семейство и другие — всего 14, см. [Подключение](#-подключение-к-харнессу)) |
+| 3 | копирует субагента-ресёрчера в каталоги найденных харнессов |
+| 4 | печатает итог и подсказки (`bathys doctor` — самодиагностика) |
+
+SearXNG устанавливать отдельно не нужно — бэкенд поднимается автоматически при первом поиске: сначала проверяется внешний инстанс, затем docker/podman, затем нативный режим (клон в `BATHYS_SEARXNG_HOME`).
 
 <details>
-<summary><b>Альтернативные пути установки</b> (npm, исходники, минимальные образы)</summary>
+<summary><b>Альтернативные пути</b> — npm, исходники, откат версии</summary>
 
-**npm** (Node-first окружения — обёртка ставит Python-пакет сама):
+**npm** (Node-first окружения; обёртка ставит Python-пакет сама):
 
 ```bash
 npm install -g bathys-mcp
@@ -51,12 +57,27 @@ bathys-mcp setup
 git clone https://github.com/Korrnals/bathys.git && cd bathys
 python3.12 -m venv .venv && .venv/bin/pip install -e .
 .venv/bin/bathys setup
-.venv/bin/python -m unittest discover -s tests    # юнит-тесты без сети
 ```
 
-В минимальном контейнерном образе без `ensurepip` venv собирается через `get-pip.py` — ветка в [docs/getting-started/install.md](docs/getting-started/install.md).
+**Откат на конкретную версию** — переменная установочного скрипта:
+
+```bash
+BATHYS_INSTALL_VERSION=0.7.0 bash install.sh
+```
+
+Минимальный образ без `ensurepip`: скрипт и `setup` сами бутстрапят pip через `get-pip.py` — подробности в [docs/getting-started/install.md](docs/getting-started/install.md).
 
 </details>
+
+### 🧹 Удаление
+
+```bash
+bathys uninstall               # снять Bathys со всех харнессов
+bathys uninstall hermes zcode   # точечно, только указанные
+bathys uninstall --purge        # + удалить venv, кэш и данные
+```
+
+`uninstall` удаляет **только записи `bathys`** из конфигов харнессов (перед изменением создаётся бэкап `*.bathys-backup-*`; чужие серверы и субагенты не затрагиваются). `--purge` дополнительно удаляет каталоги `~/.local/share/bathys` и `~/.cache/bathys`; строку `bathys/venv/bin` из `.profile`/`.bashrc` удалите вручную. Подробности и восстановление из бэкапа — в [runbook](docs/operations/runbook.md).
 
 ## 🔌 Подключение к харнессу
 
@@ -65,10 +86,10 @@ python3.12 -m venv .venv && .venv/bin/pip install -e .
 **Точечно — когда нужно именно здесь:**
 
 ```bash
-bathys install                  # автодетект всех установленных харнессов
-bathys install hermes            # только Hermes (отсутствующий конфиг создастся)
-bathys install --list            # все поддерживаемые таргеты
-bathys install --print-config    # готовые блоки для ручной вставки
+bathys install                # автодетект всех установленных харнессов
+bathys install hermes         # только Hermes (отсутствующий конфиг создастся)
+bathys install --list         # все поддерживаемые таргеты с путями
+bathys install --print-config # готовые блоки для ручной вставки
 ```
 
 Детектируются zcode, Claude Code, Claude Desktop, Cursor, VS Code-семейство (Cline / Roo Code / Kilo Code), Gemini CLI, Windsurf, Zed, opencode, goose, Hermes; форматы каждого — свои (JSON-схемы и YAML-контуры goose/hermes), запись идемпотентна с бэкапом. Для Pi (badlogic pi-mono), у которого нет MCP-конфига, — дроп-ин в `AGENTS.md`. Кастомные интеграции — в каталоге [integrations/](integrations/).
@@ -106,17 +127,17 @@ Bathys — stdio MCP-сервер: блок `mcpServers` один и тот же
 
 ## 🧭 Ходовые кейсы
 
-**Сравнение технологий.** «Сравни SQLite WAL и PostgreSQL под нагрузку — что выбрать в 2026?» → агент вызывает `deep_research`, доуточняет запрос терминами из найденного и верифицирует вывод по двум источникам. Итог: один вызов вместо цепочки «поиск + N чтений», в контекст попадает 7.5k символов вместо ~35k.
+**Сравнение технологий.** На вопрос «что выбрать под нагрузку в 2026?» агент делает один `deep_research`, доуточняет запрос терминами из найденного и верифицирует вывод по двум источникам: один вызов вместо цепочки «поиск + N чтений», в контекст попадает 7.5k символов вместо ~35k.
 
 ```text
 [bathys: 34 raw hits, top 8 considered · dove 3 pages · 35669 ch fetched → 7508 ch returned · 1.3s]
 ```
 
-**Аудит спорного утверждения.** «Правда ли, что в X упали замеры?» → стратегия `bathys_source_audit`: пакетное чтение ссылок из обсуждения + кросс-поиск опровержений → вердикт по каждому тезису с URL. Битая ссылка стоит одну строку, а не сорванный вызов.
+**Аудит спорного утверждения.** «Правда ли, что в X упали замеры?» — агент берёт стратегию `bathys_source_audit`: пакетно читает ссылки из обсуждения, ищет опровержения и выносит вердикт по каждому тезису с URL. Битая ссылка стоит одну строку, а не сорванный вызов.
 
-**Свежий срез.** «Что нового в Y за две недели?» → `bathys_fresh_scan`: поиск с `time_range=week` → пакетное чтение → сводка с датами; протухший `cache HIT` лечится одним `refresh=true`.
+**Свежий срез.** «Что нового в Y за две недели?» — стратегия `bathys_fresh_scan`: поиск с `time_range=week`, пакетное чтение, сводка с датами; протухший `cache HIT` лечится одним `refresh=true`.
 
-Все кейсы — пользовательские, автономных агентов и эксплуатация — с живыми диалогами и профитом каждого: **[«Живые кейсы» → docs/getting-started/cases.md](docs/getting-started/cases.md)**.
+Полный разбор всех кейсов — пользовательских, автономных агентов и эксплуатации — с живыми диалогами: **[docs/getting-started/cases.md](docs/getting-started/cases.md)**.
 
 ## 🛠 Инструменты
 
@@ -147,22 +168,19 @@ Bathys — stdio MCP-сервер: блок `mcpServers` один и тот же
 
 ## 📚 Документация
 
-Хаб с маршрутами «с чего начать» — [docs/index.md](docs/index.md).
+| Раздел | Что внутри | Кому |
+|---|---|---|
+| [docs/index.md](docs/index.md) | Хаб: дерево документации и три маршрута чтения | всем — точка входа |
+| [getting-started](docs/getting-started/install.md) | [Установка](docs/getting-started/install.md) · [конфигурация (20 env)](docs/getting-started/configure.md) · [подключение](docs/getting-started/integrate.md) · [живые кейсы](docs/getting-started/cases.md) | новичку |
+| [integrations](docs/integrations/overview.md) | [Обзор подключения](docs/integrations/overview.md) · [zcode](docs/integrations/zcode.md) · [Claude Code](docs/integrations/claude-code.md) · [Cursor](docs/integrations/cursor.md) · [любой MCP-клиент](docs/integrations/generic-mcp.md) | при подключении харнесса |
+| [architecture](docs/architecture/overview.md) | [Компоненты](docs/architecture/overview.md) · [конвейер очистки](docs/architecture/pipeline.md) · [потоки данных](docs/architecture/data-flow.md) | контрибьютору |
+| [contracts](docs/contracts/mcp-tools.md) | [Инструменты](docs/contracts/mcp-tools.md) · [форматы вывода](docs/contracts/output-format.md) · [модули](docs/contracts/module-contracts.md) · [конфигурация](docs/contracts/config.md) | интегратору |
+| [operations](docs/operations/runbook.md) | [Runbook](docs/operations/runbook.md) · [метрики токен-экономии](docs/operations/metrics.md) | эксплуатация |
+| [product](docs/product/charter.md) | [Хартия](docs/product/charter.md) · [функции](docs/product/features.md) · [роадмап](docs/product/roadmap.md) · [конкуренты](docs/product/competitive.md) | владельцу продукта |
+| [adr](docs/adr/0001-python-crawl4ai.md) | Шесть принятых архитектурных решений | контрибьютору |
+| [meta](docs/meta/style-guide.md) | [Стайлгайд доков](docs/meta/style-guide.md) · [глоссарий](docs/meta/glossary.md) | авторам доков |
 
-```
-docs/
-├── index.md          # хаб: дерево + три маршрута чтения
-├── getting-started/  # установка · конфигурация · подключение · живые кейсы
-├── integrations/     # zcode · claude-code · cursor · generic-mcp (+ все 14 таргетов bathys install)
-├── architecture/     # компоненты · конвейер очистки · потоки данных
-├── contracts/        # инструменты · футеры · модули · конфиг (20 env)
-├── operations/       # runbook · метрики токен-экономии
-├── product/          # хартия · реестр функций · роадмап · конкуренты
-├── adr/              # шесть принятых архитектурных решений
-└── meta/             # стайлгайд · глоссарий
-```
-
-Вне `docs/`: [agents/](agents/) (субагент `bathys-researcher`, скиллы, дроп-ин для харнессов) · [integrations/](integrations/) (кастомные интеграции: hermes, pi, zcode) · [tests/](tests/) (юнит-тесты без сети) · [scripts/](scripts/) (smoke, stdio_check, метрики) · [npm/bathys-mcp/](npm/bathys-mcp/) (NPM-обёртка) · [CHANGELOG.md](CHANGELOG.md).
+Вне `docs/`: [agents/](agents/) — субагент, скиллы, дроп-ин · [integrations/](integrations/) — кастомные интеграции (hermes, pi, zcode) · [install.sh](install.sh) — установочный скрипт · [npm/bathys-mcp/](npm/bathys-mcp/) — NPM-обёртка · [tests/](tests/) — юнит-тесты · [CHANGELOG.md](CHANGELOG.md) — история выпусков.
 
 ## 📍 Статус
 
