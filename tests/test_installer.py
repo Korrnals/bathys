@@ -114,14 +114,30 @@ class ServerEntryTest(unittest.TestCase):
         self.assertNotIn("env", entry)
 
     def test_command_is_absolute_bathys_launcher(self):
-        # The suite runs via the project venv, where the `bathys` console
-        # script exists next to sys.executable — hence the absolute path.
-        for fmt in ("zcode", "openai"):
-            with self.subTest(fmt=fmt):
-                cmd = installer._server_entry(fmt, None)["command"]
-                self.assertEqual(cmd, installer._bathys_command())
-                self.assertTrue(Path(cmd).is_absolute(), cmd)
-                self.assertTrue(cmd.endswith("/bathys"), cmd)
+        # The resolver has three tiers: launcher next to sys.executable, the
+        # repo venv, then the bare name. Only the bare-name tier may be
+        # relative — that is the CI reality (package not installed), so pin
+        # the two deterministic tiers with mocked paths instead of assuming
+        # an installed environment.
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as td:
+            launcher_dir = Path(td) / "bin"
+            launcher_dir.mkdir()
+            (launcher_dir / "bathys").write_text("#!/bin/sh\n", encoding="utf-8")
+            for fmt in ("zcode", "openai"):
+                with self.subTest(fmt=fmt):
+                    with mock.patch.object(
+                        installer.sys, "executable", str(launcher_dir / "python")
+                    ):
+                        cmd = installer._server_entry(fmt, None)["command"]
+                        self.assertEqual(cmd, str(launcher_dir / "bathys"))
+                        self.assertTrue(Path(cmd).is_absolute(), cmd)
+                        self.assertTrue(cmd.endswith("/bathys"), cmd)
+            # no launcher anywhere -> deterministic bare name
+            with mock.patch.object(installer.sys, "executable", "/no/such/python"):
+                with mock.patch.object(installer, "_PKG_DIR", Path("/no/pkg/bathys")):
+                    self.assertEqual(installer._bathys_command(), "bathys")
 
 
 class PathHelpersTest(unittest.TestCase):
