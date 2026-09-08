@@ -16,6 +16,7 @@ bathys_fresh_scan) — built-in research strategies the harness can render.
 from __future__ import annotations
 
 import contextlib
+import sys
 
 from mcp.server.fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
@@ -370,6 +371,26 @@ def _hush_stdout_logs() -> None:
 
 
 def main() -> None:
+    argv = sys.argv[1:]
+    if argv and argv[0] in ("install", "doctor"):
+        # `bathys install …` routes to the installer/doctor CLI so a single
+        # console entry-point covers both the MCP server and setup commands.
+        from . import doctor, installer
+
+        if argv[0] == "install":
+            sys.argv = ["bathys install", *argv[1:]]
+            raise SystemExit(installer.main())
+        sys.argv = ["bathys doctor", *argv[1:]]
+        raise SystemExit(doctor.main())
+    if argv and argv[0] in ("-h", "--help", "help"):
+        print("bathys — единый локальный поисковый сервис глубокого ресёрча (MCP, stdio)\n"
+              "\n"
+              "Использование:\n"
+              "  bathys            запустить MCP-сервер (stdio; для харнесса)\n"
+              "  bathys install    автоподключение к найденным харнессам "
+              "(--dry-run, --print-config, --with-agent)\n"
+              "  bathys doctor     диагностика стека (--full)\n")
+        return
     _hush_stdout_logs()
     mcp.run(transport="stdio")
 

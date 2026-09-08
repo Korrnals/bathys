@@ -130,7 +130,7 @@
 
 ### Шаг 1 — подключить MCP-сервер 🔌
 
-Блок `mcpServers` для вашего харнесса — в [integrate.md](integrate.md) и на странице конкретного клиента в [docs/integrations/](../integrations/overview.md).
+Быстрый путь — автоматический: `bathys install` найдёт харнессы по стандартным путям и пропишет сервер сам (бэкап конфига создаётся перед записью; повторный запуск ничего не меняет). Ручной путь — блоки `mcpServers` в [integrate.md](integrate.md) и на странице конкретного клиента в [docs/integrations/](../integrations/overview.md); `bathys install --print-config` печатает их готовыми.
 
 ### Шаг 2 — что получается из коробки 📦
 

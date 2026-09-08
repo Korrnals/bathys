@@ -50,3 +50,36 @@ curl -sS https://bootstrap.pypa.io/get-pip.py | .venv/bin/python
 `smoke.py` показывает живые футеры `web_search`, `read_url` и `deep_research` — по ним видно сжатие «было → стало». Первый запуск долгий: нативный режим клонирует SearXNG и ставит его зависимости в `BATHYS_SEARXNG_HOME`; повторные — мгновенные.
 
 Если оба скрипта отработали — сервер готов. Дальше: конфигурация в [configure.md](configure.md), подключение клиента в [integrate.md](integrate.md).
+
+## Шаг 5. Подключение к харнессу: автоматически
+
+Вместо ручной правки конфигов харнессов — одна команда:
+
+```bash
+.venv/bin/bathys install              # автодетект + прописывание
+.venv/bin/bathys install --dry-run    # сначала посмотреть план без записи
+.venv/bin/bathys install --with-agent # плюс субагент-ресёрчер
+```
+
+Что делает команда:
+
+- ищет харнессы по стандартным путям — `~/.zcode/cli/config.json` (zcode), `~/.claude.json` (Claude Code), `~/.cursor/mcp.json` (Cursor), `~/Library/Application Support/Claude/claude_desktop_config.json` (Claude Desktop);
+- идемпотентно прописывает сервер `bathys` в найденный конфиг: перед записью создаёт бэкап с таймстампом, повторный запуск не трогает актуальное;
+- `--searxng-home <путь>` дополнительно пишет `BATHYS_SEARXNG_HOME` в env сервера;
+- `--with-agent` копирует субагента `bathys-researcher` в каталог харнесса;
+- ничего не находит — печатает подсказку про ручной путь.
+
+После установки перезапустите харнесс — сервер поднимется при первом вызове вместе с бэкендом.
+
+### Ручное подключение (всегда доступно)
+
+`bathys install --print-config` печатает готовые блоки для вставки в конфиг каждого клиента; какие файлы за что отвечают — в [integrate.md](integrate.md) и гайдах [docs/integrations/](../integrations/overview.md).
+
+## Базовые директории
+
+По умолчанию Bathys следует платформенным конвенциям (все переопределяются env — [configure.md](configure.md)):
+
+| Назначение | Путь по умолчанию |
+|---|---|
+| Данные (нативный SearXNG, журнал метрик) | `~/.local/share/bathys` |
+| Кэш (SQLite) | `~/.cache/bathys` |

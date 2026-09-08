@@ -5,4 +5,4 @@ a query-focused distiller keeps only what answers the question. Built to spend
 the model's tokens on answers, not on boilerplate.
 """
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"

@@ -7,7 +7,7 @@
 Сонар находит координаты, батискаф ныряет за полными текстами, дистиллятор поднимает на палубу только то, что отвечает на вопрос.
 
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
-![version](https://img.shields.io/badge/version-0.5.0-9cf)
+![version](https://img.shields.io/badge/version-0.6.0-9cf)
 ![mcp](https://img.shields.io/badge/MCP-stdio%20server-6f42c1)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
@@ -28,7 +28,15 @@ python3.12 -m venv .venv
 
 ## 🔌 Подключение к харнессу
 
-Bathys — stdio MCP-сервер, поэтому конфиг везде один и тот же блок `mcpServers`; от харнесса зависит только файл, в который его кладут. `command` — абсолютный путь к вашему клону (`~` внутри JSON не раскрывается); `BATHYS_SEARXNG_HOME` опциональна.
+**Автоматически.** Одна команда найдёт харнессы по стандартным путям, пропишет сервер с бэкапом конфига и (с `--with-agent`) скопирует субагента:
+
+```bash
+.venv/bin/bathys install            # сначала --dry-run, чтобы увидеть план
+```
+
+Детектируются zcode, Claude Code, Claude Desktop, Cursor; повторный запуск ничего не меняет — запись идемпотентна. Поддерживаются `--print-config` (готовые блоки для ручной вставки) и `--searxng-home <путь>`.
+
+**Вручную.** Bathys — stdio MCP-сервер, конфиг везде один и тот же блок `mcpServers`; от харнесса зависит только файл, в который его кладут. `command` — абсолютный путь к вашему клону (`~` внутри JSON не раскрывается); `BATHYS_SEARXNG_HOME` опциональна.
 
 ```json
 {
@@ -118,7 +126,7 @@ docs/
 
 ## 📍 Статус
 
-**0.5.0.** Выпускная история: v0.2 «Качество выдачи» (ретраи, здоровье движков), v0.3 «Паритет с Tavily» (`read_urls`, JSON-режим), v0.4 «Эксплуатация» (robots-этика, метрики, `bathys-doctor`) — итоги в [CHANGELOG.md](CHANGELOG.md).
+**0.6.0.** Выпускная история: v0.2 «Качество выдачи» (ретраи, здоровье движков), v0.3 «Паритет с Tavily» (`read_urls`, JSON-режим), v0.4 «Эксплуатация» (robots-этика, метрики, `bathys-doctor`), v0.5 «Identity & Harness» (репозиционирование, промпты, субагент), v0.6 «Native Install» (`bathys install`) — итоги в [CHANGELOG.md](CHANGELOG.md).
 
 Репозиторий: `github.com/Korrnals/bathys`. До 1.0 остаются публикация пакета `bathys` на PyPI (имя свободно, публикация планируется к 1.0) и первый прогон Docker-образа; CI с matrix 3.10–3.12 уже в репозитории.
 
