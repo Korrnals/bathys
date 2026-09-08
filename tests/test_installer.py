@@ -57,9 +57,11 @@ class InstallerTmpTest(unittest.TestCase):
         if cline:
             c = mock.patch.object(installer, "_cline_targets", return_value=cline)
             c.start(); self.addCleanup(c.stop)
-        if yaml:
-            y = mock.patch.object(installer, "_yaml_targets", return_value=yaml)
-            y.start(); self.addCleanup(y.stop)
+        # Always neutralize the YAML family unless the test provides it: the
+        # host machine may have a real ~/.hermes/config.yaml which would leak
+        # into found_yaml and change exit codes.
+        y = mock.patch.object(installer, "_yaml_targets", return_value=yaml)
+        y.start(); self.addCleanup(y.stop)
 
     def patch_home(self):
         """Point installer._HOME at the sandbox (agent destination)."""
