@@ -22,6 +22,7 @@
 | `BATHYS_SEARCH_MIN_INTERVAL` | `1.0` | вежливая пауза между поисками к бэкенду, сек |
 | `BATHYS_SEARCH_RETRIES` | `2` | доп. попытки при пустой выдаче (ротация движков с паузами), 0–3 |
 | `BATHYS_DIVE_CONCURRENCY` | `4` | параллельные чтения страниц в `deep_research`, 1–8 |
+| `BATHYS_BROWSER` | `auto` | режим | двухъярусное извлечение: `auto` — HTTP-движок первым, браузер только для JS-страниц; `off` — без браузера; `always` — только браузер (отладка) |
 | `BATHYS_ROBOTS` | `1` | уважать robots.txt при чтении страниц (отказ — пометкой, не ошибкой) |
 | `BATHYS_METRICS` | `1` | писать локальный журнал вызовов `~/.local/share/bathys/metrics.jsonl` |
 | `BATHYS_ENGINE_BRAVE_KEY` | — | ключ Brave Search API: включает движок `brave` в настройках нативного SearXNG одним env |

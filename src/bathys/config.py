@@ -39,6 +39,7 @@ class Config:
     search_min_interval: float
     search_retries: int
     dive_concurrency: int
+    browser_mode: str
     respect_robots: bool
     metrics: bool
 
@@ -66,6 +67,7 @@ class Config:
             search_min_interval=float(os.environ.get("BATHYS_SEARCH_MIN_INTERVAL", "1.0")),
             search_retries=max(0, min(3, int(os.environ.get("BATHYS_SEARCH_RETRIES", "2")))),
             dive_concurrency=max(1, min(8, int(os.environ.get("BATHYS_DIVE_CONCURRENCY", "4")))),
+            browser_mode=(os.environ.get("BATHYS_BROWSER") or "auto").strip().lower(),
             respect_robots=_env_bool("BATHYS_ROBOTS", True),
             metrics=_env_bool("BATHYS_METRICS", True),
         )

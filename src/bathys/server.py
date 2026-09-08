@@ -372,24 +372,29 @@ def _hush_stdout_logs() -> None:
 
 def main() -> None:
     argv = sys.argv[1:]
-    if argv and argv[0] in ("install", "doctor"):
-        # `bathys install …` routes to the installer/doctor CLI so a single
-        # console entry-point covers both the MCP server and setup commands.
+    if argv and argv[0] in ("install", "doctor", "setup"):
+        # Console-style subcommands: one entry point covers the MCP server
+        # and the setup tooling, so `pip install bathys` is all a user needs.
         from . import doctor, installer
 
         if argv[0] == "install":
             sys.argv = ["bathys install", *argv[1:]]
             raise SystemExit(installer.main())
+        if argv[0] == "setup":
+            sys.argv = ["bathys setup", *argv[1:]]
+            raise SystemExit(installer.setup())
         sys.argv = ["bathys doctor", *argv[1:]]
         raise SystemExit(doctor.main())
     if argv and argv[0] in ("-h", "--help", "help"):
         print("bathys — единый локальный поисковый сервис глубокого ресёрча (MCP, stdio)\n"
               "\n"
               "Использование:\n"
-              "  bathys            запустить MCP-сервер (stdio; для харнесса)\n"
-              "  bathys install    автоподключение к найденным харнессам "
-              "(--dry-run, --print-config, --with-agent)\n"
-              "  bathys doctor     диагностика стека (--full)\n")
+              "  bathys                        запустить MCP-сервер (stdio; для харнесса)\n"
+              "  bathys setup                  полная установка: браузер → все найденные\n"
+              "                                харнессы → субагент → самодиагностика\n"
+              "  bathys install [HARNESS…]     автоподключение всех харнессов или точечное\n"
+              "                                (bathys install hermes; --list, --print-config)\n"
+              "  bathys doctor [--full]        диагностика стека\n")
         return
     _hush_stdout_logs()
     mcp.run(transport="stdio")

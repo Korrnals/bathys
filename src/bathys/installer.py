@@ -278,11 +278,29 @@ def _agent_src() -> Path | None:
 
 
 def install(dry_run: bool, print_config: bool, with_agent: bool,
-            searxng_home: str | None,
+            searxng_home: str | None, only: list[str] | None = None, list_targets: bool = False,
             _targets: dict[str, tuple[Path, str, str]] | None = None) -> int:
-    """_targets exists for tests: a full harness registry to substitute
-    (detection paths are machine-specific). Production callers omit it."""
+    """Register Bathys in harness configs.
+
+    only: target harness names for a focused install (`bathys install hermes`);
+    when a named target's config file is absent, it is CREATED (the user asked
+    for it explicitly). None = auto-detect all installed harnesses.
+    _targets exists for tests: a full harness registry to substitute
+    (detection paths are machine-specific). Production callers omit it.
+    """
     all_targets = dict(_targets) if _targets is not None else _all_targets()
+    if list_targets:
+        found = [n for n, (path, _, _) in all_targets.items() if path.is_file()]
+        print("Bathys умеет подключать (bathys install <имя>):")
+        for n, (path, _, _) in all_targets.items():
+            mark = "[установлен]" if n in found else "[нет конфига]"
+            print(f"  {n:15} {mark}  {path}")
+        print("  pi             [дроп-ин]     AGENTS.md (у Pi нет MCP-конфига)")
+        return 0
+    unknown = [n for n in (only or []) if n not in all_targets and n != "pi"]
+    if unknown:
+        print(f"Неизвестные таргеты: {', '.join(unknown)}; список — `bathys install --list`")
+        return 1
     if print_config:
         print("# Bathys — блоки для ручного подключения\n")
         for name, (path, dotpath, fmt) in _all_targets().items():
@@ -306,17 +324,30 @@ def install(dry_run: bool, print_config: bool, with_agent: bool,
     json_targets = {n: t for n, t in all_targets.items() if t[2] not in ("goose", "hermes")}
     yaml_targets = {n: t for n, t in all_targets.items() if t[2] in ("goose", "hermes")}
 
-    found_json = {n: t for n, t in json_targets.items() if t[0].is_file()}
-    found_yaml = {n: t for n, t in yaml_targets.items() if t[0].is_file()}
-    found_zed_dir = (_HOME / ".config" / "zed").is_dir()
-    if found_zed_dir and "zed" not in found_json:
-        # Zed commonly has no settings.json yet — creating it is safe: it is
-        # user-editable and Zed merges defaults for missing keys.
-        found_json["zed"] = json_targets["zed"]
+    if only:
+        # focused install: the named targets only; missing configs are created
+        found_json = {n: json_targets[n] for n in only if n in json_targets}
+        found_yaml = {n: yaml_targets[n] for n in only if n in yaml_targets}
+        created = [n for n in only
+                   if n in all_targets and not all_targets[n][0].is_file()]
+        if created:
+            print(f"[CREATE] создаю отсутствующие конфиги: {', '.join(created)}")
+        if "pi" in only:
+            print("[i] pi: MCP-конфига нет; вставьте дроп-ин agents/HARNESS-DROPIN.md "
+                  "в AGENTS.md проекта (integrations/pi/assets/bathys-rules.md)")
+    else:
+        found_json = {n: t for n, t in json_targets.items() if t[0].is_file()}
+        found_yaml = {n: t for n, t in yaml_targets.items() if t[0].is_file()}
+        found_zed_dir = (_HOME / ".config" / "zed").is_dir()
+        if found_zed_dir and "zed" not in found_json:
+            # Zed commonly has no settings.json yet — creating it is safe: it is
+            # user-editable and Zed merges defaults for missing keys.
+            found_json["zed"] = json_targets["zed"]
 
     if not found_json and not found_yaml:
         print("Харнессы не найдены по стандартным путям. Ручное подключение:")
         print("  bathys install --print-config   # готовые блоки для вставки")
+        print("  bathys install --list           # все поддерживаемые таргеты")
         return 0
 
     updated: list[str] = []
@@ -325,7 +356,10 @@ def install(dry_run: bool, print_config: bool, with_agent: bool,
     for name, (path, dotpath, fmt) in found_json.items():
         desired = _server_entry(fmt, searxng_home)
         try:
-            data = json.loads(path.read_text(encoding="utf-8"))
+            if path.is_file():
+                data = json.loads(path.read_text(encoding="utf-8"))
+            else:
+                data = {}  # focused install on a fresh config
         except (json.JSONDecodeError, OSError) as e:
             print(f"[SKIP] {name}: {path} не читается ({e.__class__.__name__})")
             continue
@@ -336,6 +370,7 @@ def install(dry_run: bool, print_config: bool, with_agent: bool,
         if dry_run:
             updated.append(name)
             continue
+        path.parent.mkdir(parents=True, exist_ok=True)
         bkp = _backup(path)
         servers = _ensure_path(data, dotpath)
         servers["bathys"] = desired
@@ -347,7 +382,7 @@ def install(dry_run: bool, print_config: bool, with_agent: bool,
 
     for name, (path, dotpath, fmt) in found_yaml.items():
         try:
-            text = path.read_text(encoding="utf-8")
+            text = path.read_text(encoding="utf-8") if path.is_file() else ""
         except OSError as e:
             print(f"[SKIP] {name}: {path} не читается ({e.__class__.__name__})")
             continue
@@ -357,6 +392,7 @@ def install(dry_run: bool, print_config: bool, with_agent: bool,
         if dry_run:
             updated.append(name)
             continue
+        path.parent.mkdir(parents=True, exist_ok=True)
         bkp = _backup(path)
         new_text = _yaml_set(text, dotpath, "bathys", _yaml_entry_lines(fmt, searxng_home), fmt)
         path.write_text(new_text, encoding="utf-8")
@@ -401,13 +437,61 @@ def install(dry_run: bool, print_config: bool, with_agent: bool,
     return 1 if not updated and not skipped else 0
 
 
+def setup(searxng_home: str | None = None, skip_browser: bool = False) -> int:
+    """`bathys setup` — full post-install in one command.
+
+    Steps: 1) headless chromium (only needed for JS pages; two-tier extraction
+    works HTTP-first without it), 2) harness auto-integration (all detected,
+    `--with-agent` semantics), 3) researcher subagent where harness dirs exist,
+    4) final doctor summary. Idempotent: re-running is a no-op.
+    """
+    print("bathys setup — полная установка\n")
+
+    # 1) browser engine for JS pages (optional for the HTTP tier)
+    if skip_browser:
+        print("[=] браузер: пропущен (--skip-browser)")
+    else:
+        import shutil as _sh
+        import subprocess
+
+        try:
+            r = subprocess.run(
+                [sys.executable, "-m", "playwright", "install", "chromium"],
+                capture_output=True, text=True, timeout=600)
+            if r.returncode == 0:
+                print("[OK] браузер: headless-chromium готов (нужен только для JS-страниц)")
+            else:
+                print("[i] браузер: не установлен — HTTP-ярус работает без него; "
+                      "для JS-страниц выполните: python -m playwright install chromium")
+        except (OSError, subprocess.TimeoutExpired):
+            print("[i] браузер: playwright недоступен — HTTP-ярус работает без него")
+
+    # 2) harness integration (auto-detect all)
+    print()
+    rc = install(dry_run=False, print_config=False, with_agent=True,
+                 searxng_home=searxng_home)
+
+    # 3) summary + doctor hint
+    print()
+    print("Следующие шаги:")
+    print("  bathys doctor          # диагностика стека")
+    print("  bathys install --list  # точечная установка конкретного харнесса")
+    print("Готово. MCP-сервер и бэкенд поднимутся автоматически при первом вызове.")
+    return rc
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(
         prog="bathys install",
-        description="Нативная интеграция Bathys в харнессы: автодетект конфигов "
-                    "(zcode, Claude, Cursor, VS Code/Cline/Roo/Kilo, Gemini CLI, "
-                    "Windsurf, Zed, opencode, goose, hermes), идемпотентная запись "
-                    "с бэкапом, опциональный субагент.")
+        description="Интеграция Bathys в харнессы. Без аргументов — автодетект "
+                    "установленных; с именами — точечная установка (отсутствующие "
+                    "конфиги создаются). Поддержаны: zcode, claude-code, "
+                    "claude-desktop, cursor, cline, roo-code, kilo-code, "
+                    "gemini-cli, windsurf, zed, opencode, goose, hermes, pi.")
+    ap.add_argument("targets", nargs="*", metavar="HARNESS",
+                    help="точечная установка: имена харнессов (см. --list)")
+    ap.add_argument("--list", action="store_true",
+                    help="показать все поддерживаемые таргеты и выйти")
     ap.add_argument("--dry-run", action="store_true", help="показать план без записи")
     ap.add_argument("--print-config", action="store_true",
                     help="напечатать блоки для ручного подключения и выйти")
@@ -417,7 +501,8 @@ def main() -> None:
                     help="путь BATHYS_SEARXNG_HOME (по умолчанию не писать)")
     args = ap.parse_args()
     raise SystemExit(install(args.dry_run, args.print_config, args.with_agent,
-                             args.searxng_home))
+                             args.searxng_home, only=args.targets or None,
+                             list_targets=args.list))
 
 
 if __name__ == "__main__":

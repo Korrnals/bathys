@@ -2,31 +2,35 @@
 
 # Bathys
 
-**Единый локальный поисковый сервис глубокого ресёрча для ИИ-агентов.** Один процесс владеет всем конвейером — поиск → извлечение → дистилляция под запрос → кэш — и всей стратегией ресёрча: что искать, какие страницы читать, сколько вернуть. Агент видит лишь интерфейс из четырёх MCP-инструментов; SearXNG и Crawl4AI работают внутри как сменные движки. Облачных квот и API-ключей нет, LLM внутри нет — дистилляция детерминированная (BM25).
+**Единый локальный поисковый сервис глубокого ресёрча для ИИ-агентов.** Это самостоятельный продукт, а не обёртка над чужими сервисами: Bathys реализует весь конвейер сам — метапоиск с дедупликацией и живучестью к блокировкам, двухъярусное извлечение (HTTP-движок по умолчанию, headless-браузер только для JS-страниц), пятистадийную дистилляцию под запрос с жёсткими бюджетами, TTL-кэш сырца, robots-этику, метрики и диагностику. Метапоиск и извлечение оформлены как сменные внутренние движки (SearXNG, Crawl4AI) — их можно заменить, продукт останется Bathys. Облачных квот нет; LLM внутри нет — синтез остаётся за вызывающим агентом, дистилляция детерминированная (BM25).
 
 Сонар находит координаты, батискаф ныряет за полными текстами, дистиллятор поднимает на палубу только то, что отвечает на вопрос.
 
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
-![version](https://img.shields.io/badge/version-0.6.2-9cf)
+![version](https://img.shields.io/badge/version-0.7.0-9cf)
 ![mcp](https://img.shields.io/badge/MCP-stdio%20server-6f42c1)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
 ## ⚡ Quick start
 
-**Из PyPI** (основной путь — Python ≥ 3.10):
+Три команды от чистой системы до работающего поиска (Python ≥ 3.10):
 
 ```bash
-pip install bathys                        # сервер + команды bathys/bathys-doctor
-python -m playwright install chromium     # браузер для извлечения
-bathys install                            # автоподключение к найденным харнессам
-bathys-doctor                             # диагностика стека одним запуском
+pip install bathys     # пакет: сервер + bathys setup/install/doctor
+bathys setup          # браузер для JS-страниц → все найденные харнессы → субагент
+bathys doctor         # самодиагностика стека
 ```
 
-**Из npm** (для Node-first окружений — обёртка ставит Python-пакет сама):
+`setup` идемпотентен — повторный запуск ничего не ломает. SearXNG ставить руками не нужно: бэкенд поднимется сам при первом поиске (внешний инстанс → docker → нативный режим). Браузер нужен только для JS-страниц: обычные страницы Bathys читает собственным HTTP-движком, `BATHYS_BROWSER=off` отключает браузерный ярус полностью.
+
+<details>
+<summary><b>Альтернативные пути установки</b> (npm, исходники, минимальные образы)</summary>
+
+**npm** (Node-first окружения — обёртка ставит Python-пакет сама):
 
 ```bash
 npm install -g bathys-mcp
-bathys-mcp install
+bathys-mcp setup
 ```
 
 **Из исходников** (разработка):
@@ -34,32 +38,40 @@ bathys-mcp install
 ```bash
 git clone https://github.com/Korrnals/bathys.git && cd bathys
 python3.12 -m venv .venv && .venv/bin/pip install -e .
-.venv/bin/python -m playwright install chromium
-.venv/bin/python -m unittest discover -s tests    # юнит-тесты без сети, ~0.1 c
+.venv/bin/bathys setup
+.venv/bin/python -m unittest discover -s tests    # юнит-тесты без сети
 ```
 
-В минимальном контейнерном образе без `ensurepip` venv собирается через `get-pip.py` — ветка в [docs/getting-started/install.md](docs/getting-started/install.md). SearXNG поднимать руками не нужно: при первом поиске сервер сам пробует внешний инстанс, затем docker/podman, затем нативный режим ([docs/getting-started/configure.md](docs/getting-started/configure.md)).
+В минимальном контейнерном образе без `ensurepip` venv собирается через `get-pip.py` — ветка в [docs/getting-started/install.md](docs/getting-started/install.md).
+
+</details>
 
 ## 🔌 Подключение к харнессу
 
-**Автоматически.** Одна команда найдёт харнессы по стандартным путям, пропишет сервер с бэкапом конфига и (с `--with-agent`) скопирует субагента:
+**Автоматически — весь стек:** `bathys setup` (см. выше) прописывает сервер во все найденные харнессы.
+
+**Точечно — когда нужно именно здесь:**
 
 ```bash
-.venv/bin/bathys install            # сначала --dry-run, чтобы увидеть план
+bathys install                  # автодетект всех установленных харнессов
+bathys install hermes            # только Hermes (отсутствующий конфиг создастся)
+bathys install --list            # все поддерживаемые таргеты
+bathys install --print-config    # готовые блоки для ручной вставки
 ```
 
-Детектируются zcode, Claude Code, Claude Desktop, Cursor, VS Code-семейство (Cline / Roo Code / Kilo Code), Gemini CLI, Windsurf, Zed, opencode, goose, Hermes; форматы каждого — свои (JSON-схемы и YAML-контуры goose/hermes), запись идемпотентна. Для Pi (badlogic pi-mono), у которого нет MCP-конфига, — дроп-ин в `AGENTS.md`. Поддерживаются `--print-config` (готовые блоки для ручной вставки) и `--searxng-home <путь>`; кастомные интеграции — в каталоге [integrations/](integrations/).
+Детектируются zcode, Claude Code, Claude Desktop, Cursor, VS Code-семейство (Cline / Roo Code / Kilo Code), Gemini CLI, Windsurf, Zed, opencode, goose, Hermes; форматы каждого — свои (JSON-схемы и YAML-контуры goose/hermes), запись идемпотентна с бэкапом. Для Pi (badlogic pi-mono), у которого нет MCP-конфига, — дроп-ин в `AGENTS.md`. Кастомные интеграции — в каталоге [integrations/](integrations/).
 
-**Вручную.** Bathys — stdio MCP-сервер, конфиг везде один и тот же блок `mcpServers`; от харнесса зависит только файл, в который его кладут. `command` — абсолютный путь к вашему клону (`~` внутри JSON не раскрывается); `BATHYS_SEARXNG_HOME` опциональна.
+<details>
+<summary><b>Ручное подключение</b> (когда правите конфиги сами)</summary>
+
+Bathys — stdio MCP-сервер: блок `mcpServers` один и тот же везде, от харнесса зависит только файл, в который его кладут. `command` — абсолютный путь к бинарнику (`~` внутри JSON не раскрывается); `BATHYS_SEARXNG_HOME` опциональна. Готовые блоки под каждый клиент: `bathys install --print-config`.
 
 ```json
 {
   "mcpServers": {
     "bathys": {
-      "command": "/path/to/bathys/.venv/bin/bathys",
-      "env": {
-        "BATHYS_SEARXNG_HOME": "/path/to/bathys/.runtime/searxng-home"
-      }
+      "command": "/path/to/bathys",
+      "env": { "BATHYS_SEARXNG_HOME": "/path/to/searxng-home" }
     }
   }
 }
@@ -71,6 +83,8 @@ python3.12 -m venv .venv && .venv/bin/pip install -e .
 | Claude Code / Claude Desktop | [docs/integrations/claude-code.md](docs/integrations/claude-code.md) |
 | Cursor | [docs/integrations/cursor.md](docs/integrations/cursor.md) |
 | Любой другой MCP-клиент | [docs/integrations/generic-mcp.md](docs/integrations/generic-mcp.md) |
+
+</details>
 
 ## 🧠 Научить агента работать эффективно
 
@@ -140,7 +154,7 @@ docs/
 
 ## 📍 Статус
 
-**0.6.2.** Выпускная история: v0.2 «Качество выдачи» (ретраи, здоровье движков), v0.3 «Паритет с Tavily» (`read_urls`, JSON-режим), v0.4 «Эксплуатация» (robots-этика, метрики, `bathys-doctor`), v0.5 «Identity & Harness» (репозиционирование, промпты, субагент), v0.6 «Native Install» (`bathys install`) — итоги в [CHANGELOG.md](CHANGELOG.md).
+**0.7.0.** Выпускная история: v0.2 «Качество выдачи» (ретраи, здоровье движков), v0.3 «Паритет с Tavily» (`read_urls`, JSON-режим), v0.4 «Эксплуатация» (robots-этика, метрики, `bathys-doctor`), v0.5 «Identity & Harness» (репозиционирование, промпты, субагент), v0.6 «Native Install» (`bathys install`) — итоги в [CHANGELOG.md](CHANGELOG.md).
 
 Репозиторий: `github.com/Korrnals/bathys`. До 1.0 остаются публикация пакета `bathys` на PyPI (имя свободно, публикация планируется к 1.0) и первый прогон Docker-образа; CI с matrix 3.10–3.12 уже в репозитории.
 

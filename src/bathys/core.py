@@ -313,7 +313,7 @@ class Engine:
                 self.cache.set(pk, {"error": err}, ttl=max(3600, self.cfg.page_ttl // 24))
                 raise RobotsRefusal(err)
             try:
-                page = await self.crawler.fetch(url)
+                page = await self.crawler.fetch(url, http=self.http)
             except Exception as e:
                 err = f"{e.__class__.__name__}: {e}"
                 self.cache.set(pk, {"error": err}, ttl=max(3600, self.cfg.page_ttl // 24))

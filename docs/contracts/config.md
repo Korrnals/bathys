@@ -30,6 +30,7 @@
 | `BATHYS_SEARCH_MIN_INTERVAL` | `1.0` | float, с | вежливый минимальный интервал между поисками к бэкенду (F-301); 0 — без пауз |
 | `BATHYS_SEARCH_RETRIES` | `2` | int | дoп. попытки при пустой/заблокированной выдаче с ротацией наборов движков и паузой 1.5s×n (F-101); 0–3 |
 | `BATHYS_DIVE_CONCURRENCY` | `4` | int | параллельные нырки страниц в `deep_research` (F-301); 1–8 |
+| `BATHYS_BROWSER` | `auto` | режим | двухъярусное извлечение: `auto` — HTTP-движок первым, браузер только для JS-страниц; `off` — без браузера; `always` — только браузер (отладка) |
 | `BATHYS_ROBOTS` | `1` | bool | уважать robots.txt при прямых нырках страниц (F-303); fail-open при недоступном robots; поиск не затрагивается |
 | `BATHYS_METRICS` | `1` | bool | локальный журнал вызовов `{DATA_DIR}/metrics.jsonl` (F-304); выключается полностью |
 | `BATHYS_ENGINE_BRAVE_KEY` | — | str | API-ключ Brave Search: одним ключом включает движок `brave` в генерируемых настройках SearXNG нативного режима (F-203, `services.render_settings`); для docker-режима — пропишите движок в settings сами |
