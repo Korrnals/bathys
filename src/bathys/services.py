@@ -105,6 +105,15 @@ def render_settings(base_text: str, env: dict[str, str] | None = None) -> str:
         if folder:
             engine_lines.append(f"    yandex_folder_id: {folder}")
         engine_lines.append("    inactive: false")
+    # Keyless engine orchestration (archcom #4, Phase A): the default active
+    # set is small (brave/startpage/wikipedia) and captcha-prone; BATHYS_ENGINES
+    # lets the owner pin a curated keyless set (live-audited: mwmbl+mojeek+brave
+    # serves 40+ results with zero captchas, ddg/qwant/startpage hit CAPTCHA).
+    custom = env.get("BATHYS_ENGINES", "").strip()
+    if custom:
+        names = [n.strip() for n in custom.split(",") if n.strip()]
+        for n in names:
+            engine_lines += [f"  - name: {n}", "    inactive: false"]
     if engine_lines:
         blocks.append("\nengines:\n" + "\n".join(engine_lines) + "\n")
     text = base_text

@@ -29,8 +29,11 @@ def _ch(chars: int) -> str:
 # from big-scraping backends; rotation always happens WITH backoff pauses.
 _RETRY_ENGINE_SETS: list[str | None] = [
     None,  # as requested / instance defaults
-    "duckduckgo,bing,brave,startpage",
-    "wikipedia,duckduckgo,mojeek,bing",
+    # live-audited 2026-09-09: mwmbl+mojeek+brave = 40+ results, zero captchas;
+    # duckduckgo/qwant/startpage were CAPTCHA'd at audit time — demoted to last.
+    "brave,mwmbl,mojeek,wikipedia",
+    "google cse,brave,mwmbl,mojeek",
+    "duckduckgo,bing,qwant,startpage",
 ]
 
 
@@ -66,7 +69,7 @@ class Engine:
     def _log_metrics(self, tool: str, *, cache: str | None = None, chars_in: int = 0,
                      chars_out: int = 0, secs: float = 0.0, ok: bool = True,
                      error: str | None = None, url: str | None = None,
-                     q: str | None = None) -> None:
+                     q: str | None = None, engine_set: str | None = None) -> None:
         """F-304: local JSONL journal (schema — docs/operations/metrics.md §3.2).
         Metrics must never break a tool: swallow everything."""
         if not self.cfg.metrics:
@@ -88,6 +91,7 @@ class Engine:
             "error_class": error,
             "url_hash": h(url),
             "q_hash": h(q),
+            "engine_set": engine_set,
         }
         try:
             import json as _json
@@ -282,7 +286,9 @@ class Engine:
         )
         self._log_metrics("web_search", cache="HIT" if cached else "MISS",
                           chars_in=stored["raw_chars"], chars_out=len(body),
-                          secs=secs, q=query)
+                          secs=secs, q=query,
+                          engine_set=("default" if stored.get("retries", 0) == 0
+                                      else f"retry#{stored['retries']}"))
         return body + "\n" + footer
 
     @staticmethod

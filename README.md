@@ -7,7 +7,7 @@
 Сонар находит координаты, батискаф ныряет за полными текстами, дистиллятор поднимает на палубу только то, что отвечает на вопрос.
 
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
-![version](https://img.shields.io/badge/version-0.7.2-9cf)
+![version](https://img.shields.io/badge/version-0.8.0-9cf)
 ![mcp](https://img.shields.io/badge/MCP-stdio%20server-6f42c1)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
@@ -184,7 +184,7 @@ Bathys — stdio MCP-сервер: блок `mcpServers` один и тот же
 
 ## 📍 Статус
 
-**0.7.2.** Выпускная история: v0.2 «Качество выдачи» (ретраи, здоровье движков), v0.3 «Паритет с Tavily» (`read_urls`, JSON-режим), v0.4 «Эксплуатация» (robots-этика, метрики, `bathys-doctor`), v0.5 «Identity & Harness» (репозиционирование, промпты, субагент), v0.6 «Native Install» (`bathys install`), v0.7 «Ship & Setup» (двухъярусное извлечение, `bathys setup`, однострочник, uninstall) — итоги в [CHANGELOG.md](CHANGELOG.md).
+**0.8.0.** Выпускная история: v0.2 «Качество выдачи» (ретраи, здоровье движков), v0.3 «Паритет с Tavily» (`read_urls`, JSON-режим), v0.4 «Эксплуатация» (robots-этика, метрики, `bathys-doctor`), v0.5 «Identity & Harness» (репозиционирование, промпты, субагент), v0.6 «Native Install» (`bathys install`), v0.7 «Ship & Setup» (двухъярусное извлечение, `bathys setup`, однострочник, uninstall) — итоги в [CHANGELOG.md](CHANGELOG.md).
 
 Репозиторий: `github.com/Korrnals/bathys`. Пакет опубликован: [PyPI `bathys`](https://pypi.org/project/bathys/) (pip install), однострочник установки — выше. До 1.0: публикация npm-обёртки `bathys-mcp` и первый прогон Docker-образа; CI (matrix 3.10–3.12 + shellcheck) уже в репозитории.
 

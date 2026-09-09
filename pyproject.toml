@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "bathys"
-version = "0.7.2"
+version = "0.8.0"
 description = "Unified local deep-research search service for AI agents — one pipeline (search → extraction → query distillation → cache), zero cloud quotas. MCP stdio server with native harness integration (bathys install)."
 keywords = ["mcp", "deep-research", "search", "web-search", "ai-agents", "llm", "local-first", "distillation", "searxng", "crawl4ai"]
 classifiers = [

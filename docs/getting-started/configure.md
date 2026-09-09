@@ -25,7 +25,8 @@
 | `BATHYS_BROWSER` | `auto` | двухъярусное извлечение: `auto` — HTTP-движок первым, браузер только для JS-страниц; `off` — без браузера; `always` — только браузер (отладка) |
 | `BATHYS_ROBOTS` | `1` | уважать robots.txt при чтении страниц (отказ — пометкой, не ошибкой) |
 | `BATHYS_METRICS` | `1` | писать локальный журнал вызовов `~/.local/share/bathys/metrics.jsonl` |
-| `BATHYS_ENGINE_BRAVE_KEY` | — | ключ Brave Search API: включает движок `brave` в настройках нативного SearXNG одним env |
+| `BATHYS_ENGINE_BRAVE_KEY` | — | ключ Brave Search API: включает движок `braveapi` (официальный API) в настройках нативного SearXNG одним env |
+| `BATHYS_ENGINES` | — | свой набор безключевых движков через запятую (live-аудит 2026-09-09: `mwmbl,mojeek,brave` — 40+ результатов, ноль капч); активирует их в нативном режиме |
 
 Переменные передаются в блоке `env` конфига клиента (см. [integrate.md](integrate.md)) или в шелле перед запуском проверочных скриптов.
 

@@ -33,7 +33,8 @@
 | `BATHYS_BROWSER` | `auto` | режим | двухъярусное извлечение: `auto` — HTTP-движок первым, браузер только для JS-страниц; `off` — без браузера; `always` — только браузер (отладка) |
 | `BATHYS_ROBOTS` | `1` | bool | уважать robots.txt при прямых нырках страниц (F-303); fail-open при недоступном robots; поиск не затрагивается |
 | `BATHYS_METRICS` | `1` | bool | локальный журнал вызовов `{DATA_DIR}/metrics.jsonl` (F-304); выключается полностью |
-| `BATHYS_ENGINE_BRAVE_KEY` | — | str | API-ключ Brave Search: одним ключом включает движок `brave` в генерируемых настройках SearXNG нативного режима (F-203, `services.render_settings`); для docker-режима — пропишите движок в settings сами |
+| `BATHYS_ENGINE_BRAVE_KEY` | — | str | API-ключ Brave Search: одним ключом включает движок `braveapi` (официальный API-модуль) в генерируемых настройках SearXNG нативного режима (F-203, `services.render_settings`); для docker-режима — пропишите движок в settings сами |
+| `BATHYS_ENGINES` | — | str | набор безключевых движков (через запятую) для активации в нативном режиме; live-аудит 2026-09-09: `mwmbl,mojeek,brave` (ноль капч), `duckduckgo/qwant/startpage` на момент аудита — CAPTCHA |
 
 Производные значения, не настраиваемые отдельно: TTL кэшированных ошибок fetch = `max(3600, PAGE_TTL // 24)`; TTL кэша пустой выдачи = `min(SEARCH_TTL, 600)`; сессия поискового клиента = `SEARCH_TIMEOUT`, `follow_redirects=True`; порог «плохого» движка = 3 подряд пустых/молчащих ответа (F-102, in-memory, сбрасывается любым попаданием).
 
