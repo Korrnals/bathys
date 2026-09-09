@@ -81,16 +81,32 @@ def render_settings(base_text: str, env: dict[str, str] | None = None) -> str:
     text; keep the mapping deliberately tiny and explicit."""
     env = env if env is not None else dict(os.environ)
     blocks: list[str] = []
+    engine_lines: list[str] = []
     brave = env.get("BATHYS_ENGINE_BRAVE_KEY", "").strip()
     if brave:
-        blocks.append(
-            "\nengines:\n"
-            "  - name: brave\n"
-            "    engine: brave\n"
-            "    shortcut: br\n"
-            f"    api_key: {brave}\n"
-            "    inactive: false\n"
-        )
+        # braveapi (official API module) — NOT `brave` (the scraper ignores api_key)
+        engine_lines += [
+            "  - name: braveapi", "    engine: braveapi", "    shortcut: brapi",
+            f"    api_key: {brave}", "    inactive: false",
+        ]
+    exa = env.get("BATHYS_ENGINE_EXA_KEY", "").strip()
+    if exa:
+        engine_lines += [
+            "  - name: exaapi", "    engine: exaapi", "    shortcut: exa",
+            f"    api_key: {exa}", "    inactive: false",
+        ]
+    yandex = env.get("BATHYS_ENGINE_YANDEX_KEY", "").strip()
+    if yandex:
+        folder = env.get("BATHYS_ENGINE_YANDEX_FOLDER", "").strip()
+        engine_lines += [
+            "  - name: yandex_api", "    engine: yandex_api", "    shortcut: ydxapi",
+            f"    api_key: {yandex}",
+        ]
+        if folder:
+            engine_lines.append(f"    yandex_folder_id: {folder}")
+        engine_lines.append("    inactive: false")
+    if engine_lines:
+        blocks.append("\nengines:\n" + "\n".join(engine_lines) + "\n")
     text = base_text
     if blocks:
         text = text.rstrip("\n") + "\n" + "".join(blocks)

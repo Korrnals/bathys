@@ -1,0 +1,1303 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GPU для локального LLM-инференса — полный анализ цена/качество · Сентябрь 2026</title>
+<style>
+  :root {
+    --bg: #0b0e14;
+    --bg-card: #12161f;
+    --bg-card2: #161b26;
+    --border: #232a38;
+    --border-hi: #3a4356;
+    --text: #e6e9f0;
+    --text-dim: #9aa3b5;
+    --text-faint: #6b7386;
+    --accent: #22d3ee;
+    --accent-dim: #0e7490;
+    --green: #4ade80;
+    --red: #f87171;
+    --yellow: #fbbf24;
+    --purple: #a78bfa;
+    --orange: #fb923c;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.65;
+    font-size: 16px;
+  }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+  /* ---------- HERO ---------- */
+  .hero {
+    padding: 72px 0 48px;
+    border-bottom: 1px solid var(--border);
+    background:
+      radial-gradient(ellipse 80% 50% at 70% -10%, rgba(34,211,238,.08), transparent),
+      radial-gradient(ellipse 60% 40% at 10% 10%, rgba(167,139,250,.06), transparent);
+  }
+  .hero-kicker {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid var(--accent-dim);
+    background: rgba(34,211,238,.06);
+    padding: 6px 14px; border-radius: 999px; margin-bottom: 24px;
+  }
+  .hero-kicker .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); }
+  .hero h1 {
+    font-size: clamp(30px, 5vw, 48px);
+    line-height: 1.15; letter-spacing: -0.02em; font-weight: 800;
+    max-width: 900px;
+  }
+  .hero h1 em { font-style: normal; color: var(--accent); }
+  .hero-sub { color: var(--text-dim); font-size: 18px; max-width: 760px; margin-top: 18px; }
+  .hero-sub strong { color: var(--text); }
+  .hero-meta {
+    display: flex; flex-wrap: wrap; gap: 20px; margin-top: 28px;
+    font-size: 13.5px; color: var(--text-faint);
+  }
+  .hero-meta span { display: inline-flex; align-items: center; gap: 6px; }
+  .hero-meta b { color: var(--text-dim); font-weight: 600; }
+
+  /* ---------- ALERT BANNER ---------- */
+  .alert {
+    margin-top: 36px;
+    background: linear-gradient(135deg, rgba(251,146,60,.10), rgba(251,146,60,.03));
+    border: 1px solid rgba(251,146,60,.35);
+    border-radius: 14px; padding: 18px 22px;
+    display: flex; gap: 16px; align-items: flex-start;
+  }
+  .alert .icon { font-size: 22px; line-height: 1.3; }
+  .alert p { font-size: 14.5px; color: #f3d5b8; }
+  .alert p b { color: var(--orange); }
+  .alert p + p { margin-top: 6px; }
+
+  /* ---------- SECTIONS ---------- */
+  section { padding: 64px 0; border-bottom: 1px solid var(--border); }
+  .sec-head { margin-bottom: 36px; }
+  .sec-num { font-family: var(--mono); font-size: 13px; color: var(--accent); font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
+  .sec-head h2 { font-size: clamp(24px, 3.4vw, 34px); font-weight: 750; letter-spacing: -0.01em; margin-top: 6px; }
+  .sec-head .lead { color: var(--text-dim); margin-top: 10px; max-width: 820px; font-size: 16.5px; }
+
+  /* ---------- VERDICT CARDS ---------- */
+  .podium { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  @media (max-width: 900px) { .podium { grid-template-columns: 1fr; } }
+  .vcard {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 18px;
+    padding: 26px 26px 22px; position: relative; overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .vcard.winner { border-color: rgba(74,222,128,.5); box-shadow: 0 0 40px rgba(74,222,128,.07), inset 0 1px 0 rgba(255,255,255,.04); }
+  .vcard .medal {
+    position: absolute; top: 18px; right: 18px; font-size: 28px;
+  }
+  .vcard .tag {
+    font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--accent); margin-bottom: 12px;
+  }
+  .vcard.winner .tag { color: var(--green); }
+  .vcard h3 { font-size: 21px; font-weight: 750; letter-spacing: -.01em; }
+  .vcard .price { font-family: var(--mono); font-size: 15px; color: var(--yellow); margin-top: 4px; font-weight: 600; }
+  .vcard .spec { color: var(--text-dim); font-size: 14px; margin-top: 10px; }
+  .vcard ul { list-style: none; margin-top: 16px; display: grid; gap: 7px; }
+  .vcard li { font-size: 14px; color: var(--text-dim); padding-left: 20px; position: relative; }
+  .vcard li::before { content: "✓"; position: absolute; left: 0; color: var(--green); font-weight: 700; }
+  .vcard .why {
+    margin-top: auto; padding-top: 18px; font-size: 13.5px; color: var(--text-faint);
+    border-top: 1px dashed var(--border); margin-top: 18px;
+  }
+
+  /* ---------- PHYSICS CARDS ---------- */
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .grid2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
+  @media (max-width: 900px) { .grid3, .grid2 { grid-template-columns: 1fr; } }
+  .pcard { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; }
+  .pcard .ic { font-size: 26px; margin-bottom: 12px; }
+  .pcard h3 { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+  .pcard p { font-size: 14.5px; color: var(--text-dim); }
+  .pcard p b { color: var(--text); }
+  .pcard code, .formula {
+    font-family: var(--mono); font-size: 13.5px; color: var(--accent);
+    background: rgba(34,211,238,.07); border: 1px solid rgba(34,211,238,.2);
+    padding: 3px 8px; border-radius: 6px;
+  }
+  .formula-block {
+    background: var(--bg-card2); border: 1px solid var(--border); border-radius: 14px;
+    padding: 22px 26px; margin-top: 18px;
+  }
+  .formula-block h4 { font-size: 15px; color: var(--text); margin-bottom: 10px; }
+  .formula-block .f { font-family: var(--mono); font-size: 15px; color: var(--accent); text-align: center; padding: 10px 0; }
+  .formula-block p { font-size: 13.5px; color: var(--text-dim); }
+
+  /* ---------- MARKET TABLE (crisis) ---------- */
+  .crisis-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+  .crisis-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+  .crisis-card .name { font-size: 14.5px; font-weight: 700; }
+  .crisis-card .was { font-family: var(--mono); font-size: 13px; color: var(--text-faint); margin-top: 6px; text-decoration: line-through; }
+  .crisis-card .now { font-family: var(--mono); font-size: 19px; font-weight: 700; color: var(--red); margin-top: 2px; }
+  .crisis-card .delta { display: inline-block; font-family: var(--mono); font-size: 12px; font-weight: 700; margin-top: 10px; padding: 3px 10px; border-radius: 999px; background: rgba(248,113,113,.12); color: var(--red); border: 1px solid rgba(248,113,113,.3); }
+
+  /* ---------- MASTER TABLE ---------- */
+  .table-tools { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; align-items: center; }
+  .table-tools .lbl { font-size: 13px; color: var(--text-faint); margin-right: 6px; }
+  .btn-sort {
+    font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+    background: var(--bg-card); color: var(--text-dim);
+    border: 1px solid var(--border); border-radius: 999px; padding: 7px 16px;
+    transition: all .15s;
+  }
+  .btn-sort:hover { border-color: var(--border-hi); color: var(--text); }
+  .btn-sort.active { background: rgba(34,211,238,.1); color: var(--accent); border-color: var(--accent-dim); }
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 16px; background: var(--bg-card); }
+  table.master { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 1000px; }
+  table.master th {
+    text-align: left; padding: 12px 14px; font-size: 12px; letter-spacing: .05em; text-transform: uppercase;
+    color: var(--text-faint); border-bottom: 1px solid var(--border-hi); white-space: nowrap;
+    cursor: pointer; user-select: none;
+  }
+  table.master th:hover { color: var(--accent); }
+  table.master th.sorted { color: var(--accent); }
+  table.master th .arrow { font-size: 10px; margin-left: 4px; }
+  table.master td { padding: 11px 14px; border-bottom: 1px solid var(--border); white-space: nowrap; vertical-align: middle; }
+  table.master tr:last-child td { border-bottom: none; }
+  table.master tr:hover td { background: rgba(255,255,255,.025); }
+  td.mono, .mono { font-family: var(--mono); font-size: 13px; }
+  td .gname { font-weight: 700; font-size: 14px; }
+  td .gsub { font-size: 11.5px; color: var(--text-faint); display: block; margin-top: 1px; }
+  .badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 999px; letter-spacing: .03em; }
+  .b-new { background: rgba(74,222,128,.12); color: var(--green); border: 1px solid rgba(74,222,128,.3); }
+  .b-used { background: rgba(251,191,36,.1); color: var(--yellow); border: 1px solid rgba(251,191,36,.3); }
+  .b-alt { background: rgba(167,139,250,.12); color: var(--purple); border: 1px solid rgba(167,139,250,.3); }
+  .b-sys { background: rgba(34,211,238,.1); color: var(--accent); border: 1px solid rgba(34,211,238,.3); }
+  .bar-cell { position: relative; min-width: 120px; }
+  .bar { height: 6px; border-radius: 4px; background: rgba(255,255,255,.06); overflow: hidden; margin-top: 5px; }
+  .bar i { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--accent-dim), var(--accent)); }
+  .best-val { color: var(--green); font-weight: 700; }
+
+  /* ---------- SCATTER ---------- */
+  .chart-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 22px; }
+  .chart-card h3 { font-size: 16px; margin-bottom: 4px; }
+  .chart-card .hint { font-size: 13px; color: var(--text-faint); margin-bottom: 14px; }
+  .scatter-wrap { overflow-x: auto; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 14px; font-size: 12.5px; color: var(--text-dim); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+  /* ---------- GPU CARDS DETAIL ---------- */
+  .gpu-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+  @media (max-width: 900px) { .gpu-grid { grid-template-columns: 1fr; } }
+  .gpu-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 18px; padding: 26px; position: relative; }
+  .gpu-card.pick { border-color: rgba(74,222,128,.45); }
+  .gpu-card .rank {
+    position: absolute; top: -12px; left: 22px; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+    background: var(--green); color: #052e12; padding: 4px 12px; border-radius: 999px;
+  }
+  .gpu-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+  .gpu-head h3 { font-size: 20px; font-weight: 750; }
+  .gpu-head .sub { color: var(--text-faint); font-size: 13px; margin-top: 3px; }
+  .gpu-price { text-align: right; }
+  .gpu-price .p { font-family: var(--mono); font-size: 18px; font-weight: 700; color: var(--yellow); }
+  .gpu-price .s { font-size: 11.5px; color: var(--text-faint); }
+  .gpu-stats { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0 18px; }
+  .stat { background: var(--bg-card2); border: 1px solid var(--border); border-radius: 10px; padding: 8px 14px; flex: 1; min-width: 100px; }
+  .stat .l { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-faint); }
+  .stat .v { font-family: var(--mono); font-size: 15px; font-weight: 700; margin-top: 2px; }
+  .pluses, .minuses { list-style: none; display: grid; gap: 6px; margin-top: 10px; }
+  .pluses li, .minuses li { font-size: 14px; color: var(--text-dim); padding-left: 22px; position: relative; }
+  .pluses li::before { content: "+"; position: absolute; left: 2px; color: var(--green); font-weight: 800; }
+  .minuses li::before { content: "−"; position: absolute; left: 2px; color: var(--red); font-weight: 800; }
+  .pm-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; margin-top: 16px; }
+  .pm-label.p { color: var(--green); }
+  .pm-label.m { color: var(--red); }
+  .fit-line {
+    margin-top: 18px; padding-top: 14px; border-top: 1px dashed var(--border);
+    font-size: 13px; color: var(--text-dim);
+  }
+  .fit-line b { color: var(--accent); font-weight: 700; }
+
+  /* ---------- MODELS ---------- */
+  .tier { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; margin-bottom: 16px; }
+  .tier-head { display: flex; align-items: center; gap: 14px; padding: 16px 22px; background: var(--bg-card2); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .tier-head .vr { font-family: var(--mono); font-weight: 800; font-size: 16px; color: var(--accent); min-width: 70px; }
+  .tier-head .t { font-size: 14px; color: var(--text-dim); }
+  .tier-body { padding: 8px 22px 16px; }
+  .model-row { display: flex; align-items: baseline; gap: 14px; padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,.04); flex-wrap: wrap; }
+  .model-row:last-child { border-bottom: none; }
+  .model-row .mn { font-weight: 700; font-size: 14.5px; min-width: 210px; }
+  .model-row .md { font-size: 13px; color: var(--text-dim); flex: 1; min-width: 260px; }
+  .model-row .ms { font-family: var(--mono); font-size: 12.5px; color: var(--yellow); }
+  .model-row .ml { font-size: 11px; padding: 2px 9px; border-radius: 999px; font-weight: 700; }
+  .ml-apache { background: rgba(74,222,80,.12); color: var(--green); border: 1px solid rgba(74,222,80,.3); }
+  .ml-mit { background: rgba(167,139,250,.12); color: var(--purple); border: 1px solid rgba(167,139,250,.3); }
+  .ml-gemma { background: rgba(251,191,36,.1); color: var(--yellow); border: 1px solid rgba(251,191,36,.3); }
+
+  /* ---------- SCENARIOS ---------- */
+  .scen { display: grid; gap: 14px; }
+  .scen-row {
+    display: grid; grid-template-columns: 200px 1fr 300px; gap: 22px; align-items: center;
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 20px 24px;
+    transition: border-color .15s;
+  }
+  .scen-row:hover { border-color: var(--border-hi); }
+  .scen-row.hero-scen { border-color: rgba(74,222,128,.45); background: linear-gradient(135deg, rgba(74,222,128,.05), var(--bg-card)); }
+  @media (max-width: 950px) { .scen-row { grid-template-columns: 1fr; } }
+  .scen-budget .b { font-family: var(--mono); font-size: 19px; font-weight: 800; color: var(--yellow); }
+  .scen-budget .d { font-size: 12.5px; color: var(--text-faint); margin-top: 2px; }
+  .scen-goal { font-size: 14px; color: var(--text-dim); }
+  .scen-goal b { color: var(--text); }
+  .scen-pick .n { font-weight: 750; font-size: 15.5px; color: var(--accent); }
+  .scen-pick.hero-scen-pick .n { color: var(--green); }
+  .scen-pick .w { font-size: 13px; color: var(--text-faint); margin-top: 3px; }
+
+  /* ---------- FINAL VERDICT ---------- */
+  .final {
+    background:
+      radial-gradient(ellipse 60% 80% at 80% 20%, rgba(74,222,128,.07), transparent),
+      radial-gradient(ellipse 50% 60% at 10% 80%, rgba(34,211,238,.05), transparent);
+  }
+  .final-box {
+    border: 1px solid rgba(74,222,128,.4); border-radius: 20px;
+    background: rgba(18,22,31,.85); padding: 34px 36px; margin-bottom: 22px;
+  }
+  .final-box .k { font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--green); }
+  .final-box h3 { font-size: clamp(20px, 2.6vw, 27px); margin: 10px 0 14px; line-height: 1.3; }
+  .final-box p { color: var(--text-dim); font-size: 15.5px; max-width: 900px; }
+  .final-box p b { color: var(--text); }
+  .final-box p + p { margin-top: 12px; }
+  .final-nums { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 24px; }
+  @media (max-width: 800px) { .final-nums { grid-template-columns: repeat(2,1fr); } }
+  .fnum { background: var(--bg-card2); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .fnum .l { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: .05em; }
+  .fnum .v { font-family: var(--mono); font-size: 17px; font-weight: 700; color: var(--green); margin-top: 4px; }
+
+  /* ---------- SOURCES / FOOTER ---------- */
+  .sources { list-style: none; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 28px; }
+  @media (max-width: 800px) { .sources { grid-template-columns: 1fr; } }
+  .sources li { font-size: 13px; color: var(--text-dim); padding-left: 18px; position: relative; }
+  .sources li::before { content: "↗"; position: absolute; left: 0; color: var(--accent-dim); }
+  .sources a { color: var(--text-dim); text-decoration: none; border-bottom: 1px dotted var(--border-hi); }
+  .sources a:hover { color: var(--accent); border-color: var(--accent); }
+  footer { padding: 40px 0 64px; color: var(--text-faint); font-size: 13px; }
+  footer .dis { max-width: 900px; margin-top: 10px; }
+  .note {
+    font-size: 13px; color: var(--text-faint); border-left: 3px solid var(--border-hi);
+    padding: 4px 0 4px 16px; margin-top: 18px; max-width: 860px;
+  }
+  .note b { color: var(--text-dim); }
+</style>
+</head>
+<body>
+
+<!-- ================= HERO ================= -->
+<header class="hero">
+  <div class="wrap">
+    <div class="hero-kicker"><span class="dot"></span> Исследование · данные сентября 2026</div>
+    <h1>Видеокарты для локального <em>LLM-инференса</em>:<br>полный анализ цены, скорости и vRAM</h1>
+    <p class="hero-sub">
+      Какие GPU дают лучший баланс между <strong>скоростью генерации</strong> (tok/s),
+      <strong>качеством моделей</strong>, которые реально влезают в память, и <strong>ценой</strong> —
+      с учётом аномального рынка сентября 2026 года.
+    </p>
+    <div class="hero-meta">
+      <span>📊 <b>16 GPU-конфигураций</b> · NVIDIA / AMD / Intel / альтернативы</span>
+      <span>🧠 <b>30+ моделей</b> сентября 2026 по VRAM-тирам</span>
+      <span>⏱ Бенчмарки: llama.cpp, vLLM, сообщество r/LocalLLaMA</span>
+    </div>
+
+    <div class="alert">
+      <div class="icon">⚠️</div>
+      <div>
+        <p><b>Контекст критически важен:</b> сентябрь 2026 — худший момент для покупки GPU за последние 5 лет.
+        Мировой дефицит DRAM/GDDR7 разогнал цены: <b>RTX 5090 подорожал с $2,000 до ~$4,700–5,200</b> (медиана Newegg, август 2026),
+        RTX PRO 6000 96GB — <b>до $16,000</b> (вдвое дороже запуска), 16GB-карты среднего класса — на +30–40%.</p>
+        <p>Это разворачивает весь анализ: <b>б/у-рынок, AMD и нестандартные решения</b> впервые за долгое время выглядят
+        рациональнее новых флагманов NVIDIA. Оценивайте покупки через этот призму.</p>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ================= TLDR ================= -->
+<section id="verdict">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-num">01 · Вердикт сразу</div>
+      <h2>TL;DR — три победителя</h2>
+      <p class="lead">Если не хочется читать весь анализ: вот три конфигурации, закрывающие 90% сценариев локального инференса.
+      Подробное обоснование — в секциях 4–8.</p>
+    </div>
+    <div class="podium">
+      <div class="vcard winner">
+        <div class="medal">🥇</div>
+        <div class="tag">Идеальный баланс цена / скорость / качество</div>
+        <h3>RTX 3090 (б/у) · 24 GB</h3>
+        <div class="price">≈ $1,000–1,300</div>
+        <div class="spec">936 ГБ/с · Ampere · 350 Вт</div>
+        <ul>
+          <li>Лучшие модели сентября 2026 (Qwen3.6-27B, Gemma 4 31B в Q4) — целиком в vRAM, на интерактивной скорости</li>
+          <li>gpt-oss-20b: ~160 tok/s — быстрее, чем печатает человек</li>
+          <li>gpt-oss-120b с CPU-offload MoE-слоёв: 10–15 tok/s — «фронтир-лайт» за копейки</li>
+          <li>Цена за грамм vRAM ниже, чем у любой новой карты NVIDIA</li>
+        </ul>
+        <div class="why">Почему: в условиях memory-crisis это единственный способ купить «правильные» 24 ГБ с полосой ~1 ТБ/с, не переплачивая в 3–4 раза за новый флагман.</div>
+      </div>
+      <div class="vcard">
+        <div class="medal">🥈</div>
+        <div class="tag">Если бюджет позволяет и нужно новое</div>
+        <h3>RTX 5090 · 32 GB</h3>
+        <div class="price">≈ $4,700–5,200</div>
+        <div class="spec">1,792 ГБ/с · Blackwell · 575 Вт</div>
+        <ul>
+          <li>Самая высокая плотная скорость декода в потребительском сегменте: 1.8 ТБ/с</li>
+          <li>32 ГБ = Qwen3.6-35B-A3B целиком + огромный контекст, или 70B в Q2/Q3</li>
+          <li>30B Q4: 40–55 tok/s · 8B Q4: ~220 tok/s</li>
+          <li>Но: цена ×2.3 к MSRP из-за дефицита GDDR7 — покупайте только если скорость решает</li>
+        </ul>
+        <div class="why">Почему: это лучшая одиночная карта для скорости, но сентябрь 2026 — плохой момент платить за неё: цена оторвана от MSRP.</div>
+      </div>
+      <div class="vcard">
+        <div class="medal">🥉</div>
+        <div class="tag">Максимум интеллекта за разумные деньги</div>
+        <h3>2× RTX 3090 (б/у) · 48 GB</h3>
+        <div class="price">≈ $2,000–2,600</div>
+        <div class="spec">2× 936 ГБ/с · NVlink опционально</div>
+        <ul>
+          <li>gpt-oss-120b (frontier-класс Apache 2.0) — целиком в vRAM, 25–35 tok/s</li>
+          <li>Qwen3-Coder-Next 80B и любой 70B dense в Q4 на полной скорости</li>
+          <li>Дешевле одной RTX 5090, при этом +16 ГБ памяти и в 2.5 раза больше VRAM-бюджет</li>
+          <li>Риск: б/у-железо, 700 Вт под нагрузкой, нужен БП 1000+ Вт</li>
+        </ul>
+        <div class="why">Почему: если цель — максимум качества ответов локально, 48 ГБ vRAM решают больше, чем любая одиночная потребительская карта 2026 года.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= PHYSICS ================= -->
+<section id="physics">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-num">02 · Фундамент</div>
+      <h2>Как устроен инференс: три числа, которые решают всё</h2>
+      <p class="lead">Выбор GPU для LLM — это не «сколько TFLOPS». Генерация текста — почти полностью задача чтения весов из памяти.
+      Понимание трёх метрик ниже объясняет 90% результатов бенчмарков.</p>
+    </div>
+    <div class="grid3">
+      <div class="pcard">
+        <div class="ic">🧠</div>
+        <h3>vRAM — что влезет</h3>
+        <p>Жёсткий потолок: модель, не поместившаяся в vRAM, «сваливается» в системную RAM, и скорость падает <b>в 5–20 раз</b>.
+        Правило: <b>~0.55 ГБ на 1 млрд параметров</b> в Q4, плюс 1–4 ГБ на KV-кэш контекста.<br><br>
+        <code>27B Q4 ≈ 16 ГБ · 70B Q4 ≈ 40 ГБ</code></p>
+      </div>
+      <div class="pcard">
+        <div class="ic">⚡</div>
+        <h3>Пропускная способность — как быстро</h3>
+        <p>На каждом токене GPU перечитывает активные веса. Скорость генерации почти линейно следует за <b>GB/s</b>, а не за TFLOPS.
+        Поэтому 5090 (1,792 ГБ/с) вдвое быстрее 4090 (1,008) на одной модели — и вдвое быстрее 3090 (936).</p>
+      </div>
+      <div class="pcard">
+        <div class="ic">🧩</div>
+        <h3>MoE — играchanger</h3>
+        <p>MoE-модель (gpt-oss, Qwen3.6-35B-A3B) активирует лишь <b>3–5 млрд параметров</b> на токен, но хранит все 35–120 млрд.
+        Итог: vRAM нужна как у большой модели, скорость — как у маленькой. Это главный тренд 2025–2026 и главный фактор в пользу больших объёмов vRAM.</p>
+      </div>
+    </div>
+    <div class="formula-block">
+      <h4>Приблизительная скорость генерации (dense-модель, single user):</h4>
+      <div class="f">tok/s ≈ пропускная способность (ГБ/с) ÷ размер активных весов (ГБ) × эффективность (0.4–0.6)</div>
+      <p>Пример: RTX 3090, Qwen3.6-27B Q4 (≈17 ГБ): 936 ÷ 17 × 0.45 ≈ <b>25–35 tok/s</b> — комфортно интерактивно.
+      Та же модель на Tesla P40 (347 ГБ/с): ~10 tok/s — на грани терпения. Отсюда видно, почему «дешёвые 24 ГБ» без полосы не спасают.</p>
+    </div>
+    <p class="note"><b>О терминах:</b> под «инференсом» (в запросе — «референс») понимается локальная генерация ответов моделью.
+    «Качество» задаётся тем, какая модель помещается в vRAM и в каком квантовании: Q4_K_M почти без потерь, Q2–Q3 — заметная деградация.
+    Поэтому vRAM — это не «спецификация», это и есть качество ответов.</p>
+  </div>
+</section>
+
+<!-- ================= MARKET ================= -->
+<section id="market">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-num">03 · Рынок</div>
+      <h2>Memory-crisis 2026: что произошло с ценами</h2>
+      <p class="lead">AI-бум съел мировое производство DRAM. Память подорожала в 2–3 раза, и NVIDIA транслирует это в розницу:
+      подъём цен волнами июнь→август 2026 (+3…+39% по моделям). Источники: Tom's Hardware (трекинг Newegg), TechSpot, TechPowerUp.</p>
+    </div>
+    <div class="crisis-grid">
+      <div class="crisis-card">
+        <div class="name">RTX 5090 · 32GB</div>
+        <div class="was">$1,999 MSRP</div>
+        <div class="now">≈ $4,700–5,200</div>
+        <div class="delta">+135…160%</div>
+      </div>
+      <div class="crisis-card">
+        <div class="name">RTX PRO 6000 · 96GB</div>
+        <div class="was">$8,565 запуск</div>
+        <div class="now">$16,000 (офиц. магазин NVIDIA)</div>
+        <div class="delta">+87%</div>
+      </div>
+      <div class="crisis-card">
+        <div class="name">RTX 5060 Ti 16GB</div>
+        <div class="was">$569 медиана, июнь</div>
+        <div class="now">$805 медиана, август</div>
+        <div class="delta">+39%</div>
+      </div>
+      <div class="crisis-card">
+        <div class="name">RTX 5070 · 12GB</div>
+        <div class="was">$660 медиана, июнь</div>
+        <div class="now">$900 медиана, август</div>
+        <div class="delta">+36%</div>
+      </div>
+      <div class="crisis-card">
+        <div class="name">RTX 4090 · 24GB (новая)</div>
+        <div class="was">$1,599 запуск</div>
+        <div class="now">≈ $3,499 (снят с пр-ва)</div>
+        <div class="delta">+119%</div>
+      </div>
+      <div class="crisis-card">
+        <div class="name">Б/у RTX 3090 · 24GB</div>
+        <div class="was">$700–800 (2025)</div>
+        <div class="now">$1,000–1,300</div>
+        <div class="delta">+40…60%</div>
+      </div>
+    </div>
+    <div class="grid2" style="margin-top:20px">
+      <div class="pcard">
+        <h3>🟢 Кто выиграл от кризиса</h3>
+        <p><b>AMD RX 7900 XTX ($899, 24GB)</b> — лучший новый 24GB-карт по цене: на ~70% дешевле RTX 5090 за ту же память.
+        <b>Intel Arc Pro B60/B70</b> ($649/$950) — 24–32 ГБ vRAM по цене gaming-карты, осмысленно в связках 2–4 штук.
+        <b>Tesla P40 ($240–350)</b> — самый дешёвый вход в 24 ГБ вообще, несмотря на все компромиссы.
+        <b>Mac / Strix Halo</b> — unified-память дорожает медленнее GDDR.</p>
+      </div>
+      <div class="pcard">
+        <h3>🔴 Кто проиграл</h3>
+        <p><b>RTX 5090</b> — великолепная карта, купленная по MSRP в 2025-м; переоценённая по $4,700+ в 2026-м.
+        <b>16GB-карты NVIDIA ($700–1,000)</b> — средний класс стал худшей сделкой рынка: за 16 ГБ без полосы для MoE-эпохи.
+        <b>RTX PRO 6000</b> — $16,000 за 96 ГБ: карты размазаны по облакам, локальная покупка потеряла смысл для частника.
+        Любой <b>апгрейд ради +8 ГБ</b> — сейчас переплата ×2 к нормальной цене.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= MASTER TABLE ================= -->
+<section id="table">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-num">04 · Сравнение</div>
+      <h2>Все 16 конфигураций в одной таблице</h2>
+      <p class="lead">Цены — США, сентябрь 2026 (street/б/у-рынок). Скорости — одиночный пользователь, llama.cpp/Ollama, Q4-квантование, короткий контекст.
+      «Модель-цель» — крупнейший класс моделей, который карта держит на интерактивной скорости (25+ tok/s).
+      Кликайте по заголовкам колонок для сортировки.</p>
+    </div>
+    <div class="table-tools">
+      <span class="lbl">Быстрая сортировка:</span>
+      <button class="btn-sort active" data-key="idx">как в обзоре</button>
+      <button class="btn-sort" data-key="price">цена ↑</button>
+      <button class="btn-sort" data-key="vram">vRAM ↑</button>
+      <button class="btn-sort" data-key="bw">скорость ↑</button>
+      <button class="btn-sort" data-key="val">цена за ГБ vRAM ↑</button>
+    </div>
+    <div class="table-scroll">
+      <table class="master" id="masterTable">
+        <thead>
+          <tr>
+            <th data-k="gpu">Карта <span class="arrow"></span></th>
+            <th data-k="vram">vRAM <span class="arrow"></span></th>
+            <th data-k="bw">ППК, ГБ/с <span class="arrow"></span></th>
+            <th data-k="price">Цена, $ <span class="arrow"></span></th>
+            <th data-k="val">$ / ГБ vRAM <span class="arrow"></span></th>
+            <th data-k="tps">tok/s · 8B Q4 <span class="arrow"></span></th>
+            <th data-k="fit">Модель-цель <span class="arrow"></span></th>
+            <th data-k="verdict">Вердикт <span class="arrow"></span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr data-idx="1" data-price="1000" data-vram="24" data-bw="936" data-val="52" data-tps="85" data-fit="27B Q4" data-verdict="5">
+            <td><span class="gname">RTX 3090 (б/у)</span><span class="gsub">Ampere · 350 Вт</span></td>
+            <td class="mono">24 ГБ</td>
+            <td class="mono">936</td>
+            <td class="mono">1,000–1,300</td>
+            <td class="mono">~52</td>
+            <td><span class="mono">~85</span><div class="bar-cell"><div class="bar"><i style="width:39%"></i></div></div></td>
+            <td>Qwen3.6-27B / Gemma 4 31B</td>
+            <td class="best-val">🏆 Главный выбор</td>
+          </tr>
+          <tr data-idx="2" data-price="4700" data-vram="32" data-bw="1792" data-val="147" data-tps="220" data-fit="35B MoE" data-verdict="4">
+            <td><span class="gname">RTX 5090</span><span class="gsub">Blackwell · 575 Вт</span></td>
+            <td class="mono">32 ГБ</td>
+            <td class="mono">1,792</td>
+            <td class="mono">4,700–5,200</td>
+            <td class="mono">~147</td>
+            <td><span class="mono">~220</span><div class="bar-cell"><div class="bar"><i style="width:90%"></i></div></div></td>
+            <td>Qwen3.6-35B-A3B + контекст</td>
+            <td>Самая быстрая одиночная</td>
+          </tr>
+          <tr data-idx="3" data-price="2100" data-vram="48" data-bw="936" data-val="48" data-tps="85" data-fit="120B MoE" data-verdict="5">
+            <td><span class="gname">2× RTX 3090 (б/у)</span><span class="gsub">48 ГБ · 700 Вт</span></td>
+            <td class="mono">48 ГБ</td>
+            <td class="mono">936×2</td>
+            <td class="mono">2,000–2,600</td>
+            <td class="mono">~48</td>
+            <td><span class="mono">~85</span><div class="bar-cell"><div class="bar"><i style="width:39%"></i></div></div></td>
+            <td>gpt-oss-120b целиком</td>
+            <td class="best-val">🏆 Максимум за деньги</td>
+          </tr>
+          <tr data-idx="4" data-price="899" data-vram="24" data-bw="960" data-val="37" data-tps="95" data-fit="27B Q4" data-verdict="4">
+            <td><span class="gname">RX 7900 XTX</span><span class="gsub">AMD · ROCm 7.2 · 355 Вт</span></td>
+            <td class="mono">24 ГБ</td>
+            <td class="mono">960</td>
+            <td class="mono">~899</td>
+            <td class="mono">~37</td>
+            <td><span class="mono">~95</span><div class="bar-cell"><div class="bar"><i style="width:43%"></i></div></div></td>
+            <td>27B Q4, 70B Q4 на 14–18 t/s</td>
+            <td class="best-val">Лучший новый $/ГБ</td>
+          </tr>
+          <tr data-idx="5" data-price="1800" data-vram="24" data-bw="1008" data-val="75" data-tps="120" data-fit="27B Q4" data-verdict="4">
+            <td><span class="gname">RTX 4090 (б/у)</span><span class="gsub">Ada · 450 Вт</span></td>
+            <td class="mono">24 ГБ</td>
+            <td class="mono">1,008</td>
+            <td class="mono">1,800–2,200</td>
+            <td class="mono">~75</td>
+            <td><span class="mono">~120</span><div class="bar-cell"><div class="bar"><i style="width:55%"></i></div></div></td>
+            <td>27B Q4 (+30% скорости к 3090)</td>
+            <td>Если хочется быстрее 3090</td>
+          </tr>
+          <tr data-idx="6" data-price="649" data-vram="24" data-bw="456" data-val="27" data-tps="60" data-fit="27B Q4 (медл.)" data-verdict="3">
+            <td><span class="gname">Intel Arc Pro B60</span><span class="gsub">Battlemage · 24 ГБ ECC</span></td>
+            <td class="mono">24 ГБ</td>
+            <td class="mono">456</td>
+            <td class="mono">~649</td>
+            <td class="mono">~27</td>
+            <td><span class="mono">~60</span><div class="bar-cell"><div class="bar"><i style="width:27%"></i></div></div></td>
+            <td>13–14B комфортно, 27B медленно</td>
+            <td>VRAM за копейки, но софт сырой</td>
+          </tr>
+          <tr data-idx="7" data-price="950" data-vram="32" data-bw="608" data-val="30" data-tps="70" data-fit="27B Q4" data-verdict="3">
+            <td><span class="gname">Intel Arc Pro B70</span><span class="gsub">32 ГБ ECC · 230 Вт</span></td>
+            <td class="mono">32 ГБ</td>
+            <td class="mono">608</td>
+            <td class="mono">~950</td>
+            <td class="mono">~30</td>
+            <td><span class="mono">~70</span><div class="bar-cell"><div class="bar"><i style="width:32%"></i></div></div></td>
+            <td>27B Q4 впритык-интерактивно</td>
+            <td>Дешёвые 32 ГБ / связки 4×</td>
+          </tr>
+          <tr data-idx="8" data-price="2600" data-vram="96" data-bw="456" data-val="27" data-tps="60" data-fit="120B MoE" data-verdict="4">
+            <td><span class="gname">4× Intel Arc Pro B60/B70</span><span class="gsub">96–128 ГБ суммарно</span></td>
+            <td class="mono">96–128 ГБ</td>
+            <td class="mono">608×4</td>
+            <td class="mono">2,600–3,800</td>
+            <td class="mono">~27–30</td>
+            <td><span class="mono">~70/карта</span><div class="bar-cell"><div class="bar"><i style="width:32%"></i></div></div></td>
+            <td>gpt-oss-120b на ~25–30 t/s</td>
+            <td>Бюджетный «фронтир-компьютер»</td>
+          </tr>
+          <tr data-idx="9" data-price="1500" data-vram="16" data-bw="960" data-val="94" data-tps="140" data-fit="14B Q4" data-verdict="2">
+            <td><span class="gname">RTX 5080</span><span class="gsub">16 ГБ · 300 Вт</span></td>
+            <td class="mono">16 ГБ</td>
+            <td class="mono">960</td>
+            <td class="mono">1,500–1,580</td>
+            <td class="mono">~94</td>
+            <td><span class="mono">~140</span><div class="bar-cell"><div class="bar"><i style="width:64%"></i></div></div></td>
+            <td>gpt-oss-20b / Gemma 4 12B</td>
+            <td>Быстро, но 16 ГБ — мало в 2026</td>
+          </tr>
+          <tr data-idx="10" data-price="1100" data-vram="16" data-bw="896" data-val="69" data-tps="100" data-fit="14B Q4" data-verdict="2">
+            <td><span class="gname">RTX 5070 Ti</span><span class="gsub">16 ГБ · 300 Вт</span></td>
+            <td class="mono">16 ГБ</td>
+            <td class="mono">896</td>
+            <td class="mono">1,100–1,150</td>
+            <td class="mono">~69</td>
+            <td><span class="mono">~100</span><div class="bar-cell"><div class="bar"><i style="width:46%"></i></div></div></td>
+            <td>gpt-oss-20b / 14B Q4</td>
+            <td>Игровая карта, не LLM-карта</td>
+          </tr>
+          <tr data-idx="11" data-price="780" data-vram="16" data-bw="448" data-val="49" data-tps="65" data-fit="13B Q4" data-verdict="2">
+            <td><span class="gname">RTX 5060 Ti 16GB</span><span class="gsub">+39% к цене за полгода</span></td>
+            <td class="mono">16 ГБ</td>
+            <td class="mono">448</td>
+            <td class="mono">758–805</td>
+            <td class="mono">~49</td>
+            <td><span class="mono">~65</span><div class="bar-cell"><div class="bar"><i style="width:30%"></i></div></div></td>
+            <td>gpt-oss-20b / 12–13B Q4</td>
+            <td>Вход в CUDA, но переплата</td>
+          </tr>
+          <tr data-idx="12" data-price="700" data-vram="16" data-bw="640" data-val="44" data-tps="95" data-fit="14B Q4" data-verdict="3">
+            <td><span class="gname">RX 9070 XT</span><span class="gsub">AMD · RDNA4 · 16 ГБ</span></td>
+            <td class="mono">16 ГБ</td>
+            <td class="mono">640</td>
+            <td class="mono">~700</td>
+            <td class="mono">~44</td>
+            <td><span class="mono">~95</span><div class="bar-cell"><div class="bar"><i style="width:43%"></i></div></div></td>
+            <td>gpt-oss-20b / 13B Q4</td>
+            <td>Разумный вход в 16 ГБ</td>
+          </tr>
+          <tr data-idx="13" data-price="300" data-vram="24" data-bw="347" data-val="13" data-tps="35" data-fit="batch" data-verdict="2">
+            <td><span class="gname">Tesla P40 (б/у)</span><span class="gsub">Pascal 2016 · поддержка CUDA заканчивается</span></td>
+            <td class="mono">24 ГБ</td>
+            <td class="mono">347</td>
+            <td class="mono">240–350</td>
+            <td class="mono">~13</td>
+            <td><span class="mono">~35</span><div class="bar-cell"><div class="bar"><i style="width:16%"></i></div></div></td>
+            <td>batch/embeddings, вторая машина</td>
+            <td>Дёшево влезть, больно жить</td>
+          </tr>
+          <tr data-idx="14" data-price="2000" data-vram="128" data-bw="212" data-val="16" data-tps="80" data-fit="120B MoE" data-verdict="4">
+            <td><span class="gname">Strix Halo mini-PC</span><span class="gsub">Ryzen AI Max+ 395 · 128 ГБ shared</span></td>
+            <td class="mono">128 ГБ</td>
+            <td class="mono">~212</td>
+            <td class="mono">1,800–2,400</td>
+            <td class="mono">~16</td>
+            <td><span class="mono">~80</span><div class="bar-cell"><div class="bar"><i style="width:36%"></i></div></div></td>
+            <td>MoE-модели до 120B, 10–20 t/s</td>
+            <td>MoE-король за деньги</td>
+          </tr>
+          <tr data-idx="15" data-price="6500" data-vram="192" data-bw="546" data-val="34" data-tps="150" data-fit="405B Q2" data-verdict="4">
+            <td><span class="gname">Mac Studio M3 Ultra 128–192GB</span><span class="gsub">546 ГБ/с unified · ~200 Вт</span></td>
+            <td class="mono">128–192 ГБ</td>
+            <td class="mono">546</td>
+            <td class="mono">6,500–9,000</td>
+            <td class="mono">~34</td>
+            <td><span class="mono">~150*</span><div class="bar-cell"><div class="bar"><i style="width:60%"></i></div></div></td>
+            <td>70B Q4: 8–15 t/s, GLM-5.1 влезает</td>
+            <td>Для больших MoE и тишины</td>
+          </tr>
+          <tr data-idx="16" data-price="16000" data-vram="96" data-bw="1792" data-val="167" data-tps="245" data-fit="120B MoE full" data-verdict="5">
+            <td><span class="gname">RTX PRO 6000 96GB</span><span class="gsub">Blackwell · ECC · 300–600 Вт</span></td>
+            <td class="mono">96 ГБ</td>
+            <td class="mono">1,792</td>
+            <td class="mono">~16,000</td>
+            <td class="mono">~167</td>
+            <td><span class="mono">~245</span><div class="bar-cell"><div class="bar"><i style="width:100%"></i></div></div></td>
+            <td>gpt-oss-120b: 170 tok/s (!)</td>
+            <td>Тех-совершенство, ценовое безумие</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">* Mac Studio: tok/s указан для gpt-oss-20b (MLX), для 70B dense падает до 8–15 t/s —
+    unified-память огромна, но полоса 546 ГБ/с ограничивает dense-модели. MoE на Mac раскрываются лучше.
+    «ППК» — пропускная способность памяти. Полную детализацию по каждой карте — в карточках ниже.</p>
+  </div>
+</section>
+
+<!-- ================= SCATTER ================= -->
+<section id="scatter">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-num">05 · Визуализация</div>
+      <h2>Цена против скорости: карта рынка</h2>
+      <p class="lead">Каждая точка — конфигурация. Ось X — цена (лог. шкала), ось Y — пропускная способность памяти (главный предиктор скорости генерации).
+      «Идеальный баланс» — правый нижний угол: максимум ГБ/с за минимум долларов. Линия тренда помогает увидеть, кто над линией (переплата) и кто под ней (выгодная сделка).</p>
+    </div>
+    <div class="chart-card">
+      <div class="scatter-wrap">
+        <svg viewBox="0 0 1120 560" width="100%" style="min-width:820px" role="img" aria-label="Диаграмма рассеяния: цена GPU против пропускной способности памяти">
+          <defs>
+            <linearGradient id="lg" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#22d3ee" stop-opacity=".25"/>
+              <stop offset="1" stop-color="#a78bfa" stop-opacity=".25"/>
+            </linearGradient>
+          </defs>
+          <!-- X: x = 80 + (log10(p/250)/log10(64)) * 990 ; Y: y = 470 - (bw/1900)*400 -->
+          <g font-family="ui-monospace, Menlo, monospace" font-size="12" fill="#6b7386">
+            <line x1="80" y1="470" x2="1070" y2="470" stroke="#232a38"/>
+            <line x1="80" y1="70" x2="80" y2="470" stroke="#232a38"/>
+            <!-- Y labels -->
+            <text x="70" y="474" text-anchor="end">0</text>
+            <text x="70" y="369" text-anchor="end">500</text>
+            <text x="70" y="264" text-anchor="end">1000</text>
+            <text x="70" y="159" text-anchor="end">1500</text>
+            <text x="70" y="75" text-anchor="end">1900</text>
+            <!-- X labels (log ticks: 250, 1k, 3k, 8k, 16k) -->
+            <text x="80" y="492" text-anchor="middle">$250</text>
+            <text x="410" y="492" text-anchor="middle">$1,000</text>
+            <text x="672" y="492" text-anchor="middle">$3,000</text>
+            <text x="905" y="492" text-anchor="middle">$8,000</text>
+            <text x="1070" y="492" text-anchor="middle">$16,000</text>
+            <text x="575" y="530" text-anchor="middle" font-size="13" fill="#9aa3b5">Цена, USD (лог. шкала) →</text>
+            <text x="30" y="270" transform="rotate(-90 30 270)" text-anchor="middle" font-size="13" fill="#9aa3b5">Память: ГБ/с →</text>
+          </g>
+          <!-- "smart buy" zone: $250..$1500, bw 1000..1900 -->
+          <rect x="80" y="70" width="430" height="180" fill="url(#lg)" rx="10"/>
+          <text x="95" y="95" font-size="13" fill="#4ade80" font-weight="700">ЗОНА ВЫГОДЫ</text>
+          <text x="95" y="113" font-size="11.5" fill="#9aa3b5">высокая полоса за низкую цену</text>
+          <!-- points: (price, bw) -->
+          <g>
+            <!-- Tesla P40: $300, 347 -->
+            <circle cx="123" cy="397" r="7" fill="#f87171" opacity=".85"/><text x="135" y="401" font-size="12" fill="#9aa3b5">P40 24GB</text>
+            <!-- Arc B60: $649, 456 -->
+            <circle cx="307" cy="374" r="7" fill="#fbbf24" opacity=".85"/><text x="299" y="369" text-anchor="end" font-size="12" fill="#9aa3b5">Arc B60 24GB</text>
+            <!-- Arc B70: $950, 608 -->
+            <circle cx="398" cy="342" r="7" fill="#fbbf24" opacity=".85"/><text x="410" y="346" font-size="12" fill="#9aa3b5">Arc B70 32GB</text>
+            <!-- 5060 Ti: $780, 448 -->
+            <circle cx="351" cy="376" r="6" fill="#f87171" opacity=".8"/><text x="290" y="398" font-size="12" fill="#9aa3b5">5060 Ti 16GB</text>
+            <!-- RX 9070 XT: $700, 640 -->
+            <circle cx="325" cy="335" r="6" fill="#fbbf24" opacity=".85"/><text x="313" y="328" text-anchor="end" font-size="12" fill="#9aa3b5">RX 9070 XT 16GB</text>
+            <!-- RX 7900 XTX: $899, 960 -->
+            <circle cx="385" cy="268" r="8" fill="#4ade80" opacity=".9"/><text x="385" y="252" text-anchor="middle" font-size="12" fill="#4ade80" font-weight="700">RX 7900 XTX</text>
+            <!-- RTX 3090: $1150, 936 -->
+            <circle cx="443.3" cy="272.9" r="9" fill="#4ade80" opacity="1" stroke="#e6e9f0" stroke-width="1.5"/><text x="457" y="267" font-size="13" fill="#4ade80" font-weight="800">3090 🏆</text>
+            <!-- 5070 Ti: $1100, 896 -->
+            <circle cx="434" cy="281" r="6" fill="#22d3ee" opacity=".8"/><text x="446" y="294" font-size="12" fill="#9aa3b5">5070 Ti 16GB</text>
+            <!-- RTX 4090 used: $2000, 1008 -->
+            <circle cx="574" cy="258" r="7" fill="#22d3ee" opacity=".85"/><text x="562" y="248" text-anchor="end" font-size="12" fill="#9aa3b5">4090 б/у 24GB</text>
+            <!-- 2x 3090: $2300, 936 -->
+            <circle cx="608" cy="273" r="9" fill="#4ade80" opacity="1" stroke="#e6e9f0" stroke-width="1.5"/><text x="622" y="267" font-size="13" fill="#4ade80" font-weight="800">2× RTX 3090 (48GB) 🏆</text>
+            <!-- 5080: $1540, 960 -->
+            <circle cx="513" cy="268" r="6" fill="#22d3ee" opacity=".85"/><text x="525" y="291" font-size="12" fill="#9aa3b5">5080 16GB</text>
+            <!-- Strix Halo: $2100, 212 -->
+            <circle cx="587" cy="425" r="7" fill="#22d3ee" opacity=".85"/><text x="599" y="429" font-size="12" fill="#9aa3b5">Strix Halo 128GB</text>
+            <!-- 4x Arc B60: $3200, 1824 total -->
+            <circle cx="687" cy="86" r="8" fill="#fbbf24" opacity=".9"/><text x="699" y="82" font-size="13" fill="#fbbf24" font-weight="700">4× Arc B60 (96GB)</text>
+            <!-- RTX 5090: $4950, 1792 -->
+            <circle cx="790" cy="93" r="8" fill="#a78bfa" opacity=".9"/><text x="802" y="112" font-size="13" fill="#a78bfa" font-weight="700">RTX 5090 32GB</text>
+            <!-- Mac Studio: $7750, 546 -->
+            <circle cx="897" cy="355" r="7" fill="#a78bfa" opacity=".85"/><text x="909" y="359" font-size="12" fill="#9aa3b5">Mac Studio 192GB</text>
+            <!-- PRO 6000: $16000, 1792 -->
+            <circle cx="1070" cy="93" r="8" fill="#f87171" opacity=".9"/><text x="1058" y="80" text-anchor="end" font-size="13" fill="#f87171" font-weight="700">PRO 6000 96GB</text>
+          </g>
+        </svg>
+      </div>
+      <div class="legend">
+        <span><i style="background:#4ade80"></i> выгодные сделки (над/под линией в вашу пользу)</span>
+        <span><i style="background:#22d3ee"></i> сбалансированные</span>
+        <span><i style="background:#a78bfa"></i> флагманы (плата за скорость)</span>
+        <span><i style="background:#fbbf24"></i> нестандартные (Intel/AMD-связки)</span>
+        <span><i style="background:#f87171"></i> проблемные сделки сентября 2026</span>
+      </div>
+    </div>
+    <p class="note"><b>Как читать:</b> диаграмма показывает физику, а не маркетинг. Точка «4× Arc B60» стоит по совокупной полосе всех карт —
+    в реальности это 4 независимых GPU (тензор-параллеллизм с однойCCL/vLLM), что даёт агрегированную скорость на MoE-моделях, но не на dense.
+    Аналогично 2×3090: удвоение полосы работает на split-моделях в llama.cpp почти линейно для MoE, и с потерями 10–20% для dense.</p>
+  </div>
+</section>
+
+<!-- ================= GPU DETAIL CARDS ================= -->
+<section id="cards">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-num">06 · Детали</div>
+      <h2>Карточки финалистов: плюсы и минусы</h2>
+      <p class="lead">Развёрнутый разбор каждой значимой конфигурации: что получите, чем заплатите, какие модели запускать.</p>
+    </div>
+    <div class="gpu-grid">
+
+      <div class="gpu-card pick">
+        <div class="rank">🥇 Идеальный баланс</div>
+        <div class="gpu-head">
+          <div><h3>RTX 3090 (б/у)</h3><div class="sub">Ampere · 24 ГБ GDDR6X · 10496 CUDA · NVlink ×2</div></div>
+          <div class="gpu-price"><div class="p">$1,000–1,300</div><div class="s">б/у рынок, сент. 2026</div></div>
+        </div>
+        <div class="gpu-stats">
+          <div class="stat"><div class="l">Память</div><div class="v">24 ГБ / 936 ГБ/с</div></div>
+          <div class="stat"><div class="l">8B Q4</div><div class="v">~85 t/s</div></div>
+          <div class="stat"><div class="l">gpt-oss-20b</div><div class="v">~160 t/s</div></div>
+          <div class="stat"><div class="l">27B Q4</div><div class="v">~28–35 t/s</div></div>
+        </div>
+        <div class="pm-label p">Плюсы</div>
+        <ul class="pluses">
+          <li>Точный размер под лучшие модели сентября 2026: Qwen3.6-27B Q4 (~16 ГБ) и Gemma 4 31B Q4 — с полным KV-кэшем и запасом</li>
+          <li>Полоса 936 ГБ/с — на уровне RTX 4090 за половину цены б/у</li>
+          <li>gpt-oss-20b на llama.cpp: 160+ tok/s — reasoning-модель со скоростью чата</li>
+          <li>gpt-oss-120b с --n-cpu-moe: MoE-слои в RAM, 10–15 tok/s — фронтир-качество за $1,200</li>
+          <li>Последнее поколение с NVlink — пара карт работает без PCIe-потерь</li>
+        </ul>
+        <div class="pm-label m">Минусы</div>
+        <ul class="minuses">
+          <li>Б/у-риск: майнинг-прошлое, менять термопасту почти обязательно, проверка под нагрузкой обязательна</li>
+          <li>350 Вт в пике — нужен качественный БП 750+ Вт и продуманное охлаждение</li>
+          <li>Нет native FP8/FP4: новые Blackwell-кванты недоступны (для Q4-инференса неважно)</li>
+          <li>Цена б/у уже выросла на 40–60% из-за кризиса — «дёшево» относительно, не абсолютно</li>
+        </ul>
+        <div class="fit-line"><b>Берите, если:</b> нужен один GPU на каждый день, бюджет $800–1,400, и вы хотите лучшие доступные модели на интерактивной скорости. Компанию к ней через год составит вторая такая же → 48 ГБ.</div>
+      </div>
+
+      <div class="gpu-card">
+        <div class="gpu-head">
+          <div><h3>RTX 5090</h3><div class="sub">Blackwell · 32 ГБ GDDR7 · 21,760 CUDA · 575 Вт</div></div>
+          <div class="gpu-price"><div class="p">$4,700–5,200</div><div class="s">street, сент. 2026 (MSRP $1,999)</div></div>
+        </div>
+        <div class="gpu-stats">
+          <div class="stat"><div class="l">Память</div><div class="v">32 ГБ / 1,792 ГБ/с</div></div>
+          <div class="stat"><div class="l">8B Q4</div><div class="v">~220 t/s</div></div>
+          <div class="stat"><div class="l">30B Q4</div><div class="v">40–55 t/s</div></div>
+          <div class="stat"><div class="l">70B Q4 (offload)</div><div class="v">14–22 t/s</div></div>
+        </div>
+        <div class="pm-label p">Плюсы</div>
+        <ul class="pluses">
+          <li>Самая высокая скорость генерации среди потребительских карт — 1.8 ТБ/с полосы</li>
+          <li>32 ГБ: Qwen3.6-35B-A3B MoE целиком + 100K+ контекста — «лучший all-rounder» 2026 без компромиссов</li>
+          <li>Native FP4/FP8: future-proof под новые кванты и speculative decoding</li>
+          <li>pp (prefill) скорость — огромная: длинные промпты не заставляют ждать</li>
+        </ul>
+        <div class="pm-label m">Минусы</div>
+        <ul class="minuses">
+          <li>Цена ×2.3 к MSRP: $4,700+ — худшая сделка на рынке в пересчёте $/ГБ (~$147/ГБ против $52 у б/у 3090)</li>
+          <li>70B dense Q4 (~40 ГБ) не влезает — для этого класса нужны 48 ГБ или offload</li>
+          <li>575 Вт, 16-pin коннектор (истории о плавленных кабелях), требования к БП 1200 Вт</li>
+          <li>Санкционные/региональные наценки: вне США часто ещё дороже</li>
+        </ul>
+        <div class="fit-line"><b>Берите, если:</b> скорость генерации критична (агенты, reasoning-модели с длинными цепочками), бюджет $5K не жалко, и есть 1200-ваттный БП. Иначе — деньги на ветер в этом квартале.</div>
+      </div>
+
+      <div class="gpu-card pick">
+        <div class="rank">🥉 Максимум качества за деньги</div>
+        <div class="gpu-head">
+          <div><h3>2× RTX 3090 (б/у)</h3><div class="sub">48 ГБ суммарно · NVlink мост (опц.)</div></div>
+          <div class="gpu-price"><div class="p">$2,000–2,600</div><div class="s">за пару, б/у</div></div>
+        </div>
+        <div class="gpu-stats">
+          <div class="stat"><div class="l">Память</div><div class="v">48 ГБ / 1,872 ГБ/с</div></div>
+          <div class="stat"><div class="l">gpt-oss-120b</div><div class="v">25–35 t/s</div></div>
+          <div class="stat"><div class="l">70B Q4</div><div class="v">~30–40 t/s</div></div>
+          <div class="stat"><div class="l">TDP</div><div class="v">700 Вт пара</div></div>
+        </div>
+        <div class="pm-label p">Плюсы</div>
+        <ul class="pluses">
+          <li>48 ГБ — порог, на котором gpt-oss-120b (59 ГБ MXFP4 в Q4-репаке ~45 ГБ) и Nemotron 3 Super работают целиком без offload</li>
+          <li>gpt-oss-120b целиком в vRAM: 25–35 tok/s — frontier-класс reasoning локально</li>
+          <li>Qwen3-Coder-Next 80B (агент-кодинг) и любые 70B dense Q4 — на полной скорости</li>
+          <li>Дешевле одной RTX 5090 при большем VRAM-бюджете; апгрейд-путь: начать с одной, докупить вторую</li>
+        </ul>
+        <div class="pm-label m">Минусы</div>
+        <ul class="minuses">
+          <li>llama.cpp multi-GPU: слои сплитятся хорошо, но dense-модели теряют 10–20% скорости против идеала; NVlink-мост частично лечит (только у 3090!)</li>
+          <li>700 Вт суммарно: БП 1000+ Вт, тепло в комнате, лето без кондиционера — страдание</li>
+          <li>Две б/у-карты = двойной риск деградации; покупать у проверенных продавцов</li>
+          <li>Не все фреймворки дружат с multi-GPU из коробки (vLLM требует компиляции, Ollama/LM Studio — ок)</li>
+        </ul>
+        <div class="fit-line"><b>Берите, если:</b> главное — качество ответов (120B MoE > 27B dense), бюджет $2–2.6K, есть корпус E-ATX и киловатт энергии. Лучший «мозг за деньги» 2026.</div>
+      </div>
+
+      <div class="gpu-card">
+        <div class="gpu-head">
+          <div><h3>AMD RX 7900 XTX</h3><div class="sub">RDNA3 · 24 ГБ GDDR6 · ROCm 7.2</div></div>
+          <div class="gpu-price"><div class="p">~$899</div><div class="s">новая, сент. 2026</div></div>
+        </div>
+        <div class="gpu-stats">
+          <div class="stat"><div class="l">Память</div><div class="v">24 ГБ / 960 ГБ/с</div></div>
+          <div class="stat"><div class="l">8B Q4</div><div class="v">~95 t/s</div></div>
+          <div class="stat"><div class="l">70B Q4</div><div class="v">14–18 t/s</div></div>
+          <div class="stat"><div class="l">$ / ГБ</div><div class="v">~$37</div></div>
+        </div>
+        <div class="pm-label p">Плюсы</div>
+        <ul class="pluses">
+          <li>Лучший новый 24 ГБ-карт по $/ГБ на рынке NVIDIA+AMD — вдвое дешевле б/у 4090</li>
+          <li>ROCm 7.2 (2026) наконец-то починил софт-историю: llama.cpp/vLLM работают стабильно на RDNA3</li>
+          <li>70B Q4 на 14–18 tok/s — редкая возможность потрогать 70B на карте дешевле $1,000</li>
+          <li>Новая карта = гарантия, никакой б/у-лотереи</li>
+        </ul>
+        <div class="pm-label m">Минусы</div>
+        <ul class="minuses">
+          <li>Софт всё ещё второсортный: FlashAttention на ROCm — местами, кванты — через Vulcan-бэкенды, vLLM-фичи отстают от CUDA</li>
+          <li>Нативные GGUF-ядра (RowSplit/MMA) медленнее CUDA-аналогов на 10–25% в отдельных моделях</li>
+          <li>Нет CUDA: unsloth/fine-tuning生态 недоступна, speculative decoding ограничен</li>
+          <li>Производство RDNA3 сворачивается — к 2027 это будет «б/у-эквивалент» без цены 3090</li>
+        </ul>
+        <div class="fit-line"><b>Берите, если:</b> хотите новую карту с гарантом за <$1K, готовы к шаманству с ROCm ради экономии $300–500 против б/у 3090. Vulkan-бэкенд llama.cpp — ваш друг.</div>
+      </div>
+
+      <div class="gpu-card">
+        <div class="gpu-head">
+          <div><h3>Intel Arc Pro B60 / B70</h3><div class="sub">Battlemage · 24/32 ГБ GDDR6 ECC · 200–230 Вт</div></div>
+          <div class="gpu-price"><div class="p">$649 / $950</div><div class="s">новые</div></div>
+        </div>
+        <div class="gpu-stats">
+          <div class="stat"><div class="l">Память</div><div class="v">24–32 ГБ / 456–608 ГБ/с</div></div>
+          <div class="stat"><div class="l">8B Q4</div><div class="v">~50–70 t/s</div></div>
+          <div class="stat"><div class="l">4× B70 = 128 ГБ</div><div class="v">~$3,800</div></div>
+          <div class="stat"><div class="l">$ / ГБ</div><div class="v">$27–30</div></div>
+        </div>
+        <div class="pm-label p">Плюсы</div>
+        <ul class="pluses">
+          <li>Самый дешёвый новый VRAM на рынке: $27–30/ГБ — втрое дешевле 5090</li>
+          <li>ECC-память и низкий TDP (230 Вт) — серверная дисциплина по потребительской цене</li>
+          <li>4× B70 = 128 ГБ за $3,800: gpt-oss-120b на 25–30 t/s, DeepSeek-V4-Flash 284B влезает</li>
+          <li>SR-IOV виртуализация — единственные карты, честно отдающие vGPU-срезы</li>
+          <li>llama.cpp Vulkan работает прилично; llama.cpp SYCL — быстро развивается</li>
+        </ul>
+        <div class="pm-label m">Минусы</div>
+        <ul class="minuses">
+          <li>Полоса 456–608 ГБ/с: dense-модели медленные — 27B Q4 на грани интерактива (~15–18 t/s)</li>
+          <li>Софт-стек «кость в горле»: vLLM только через intel/llm-scaler контейнер, quants — «untested», llama.cpp — «roll of the dice» (слова HN-комьюнити)</li>
+          <li>Одна карта медленнее RTX 5090 в 4–5 раз на инференсе — смысл только в связках</li>
+          <li>Экосистема: неожиданные баги драйверов, слабое сообщество, нет unsloth/fine-tuning</li>
+        </ul>
+        <div class="fit-line"><b>Берите, если:</b> строите бюджетный multi-GPU-бокс «128 ГБ за $4K» под MoE-модели и готовы бороться с софтом. Одиночная B60/B70 — только для экспериментов.</div>
+      </div>
+
+      <div class="gpu-card">
+        <div class="gpu-head">
+          <div><h3>RTX PRO 6000 Blackwell 96 ГБ</h3><div class="sub">Blackwell · 96 ГБ GDDR7 ECC · блауэр-кулер</div></div>
+          <div class="gpu-price"><div class="p">~$16,000</div><div class="s">официальный магазин NVIDIA, сент. 2026</div></div>
+        </div>
+        <div class="gpu-stats">
+          <div class="stat"><div class="l">Память</div><div class="v">96 ГБ / 1,792 ГБ/с</div></div>
+          <div class="stat"><div class="l">gpt-oss-120b</div><div class="v">170 t/s (!)</div></div>
+          <div class="stat"><div class="l">Prefill</div><div class="v">4,500 t/s</div></div>
+          <div class="stat"><div class="l">Max-Q (300 Вт)</div><div class="v">~90% скор.</div></div>
+        </div>
+        <div class="pm-label p">Плюсы</div>
+        <ul class="pluses">
+          <li>Единственная одиночная карта, где gpt-oss-120b летает: 170 tok/s generation, 4,500 tok/s prefill (llama-bench, MXFP4)</li>
+          <li>96 ГБ: 70B FP8, Mistral Medium 3.5 128B Q4, Nemotron Ultra 253B Q3 — всё влезает</li>
+          <li>ECC, enterprise-драйверы, 2-слотовый блауэр — можно ставить 4 в станок без водянки</li>
+          <li>Максимум локального интеллекта без offload-компромиссов</li>
+        </ul>
+        <div class="pm-label m">Минусы</div>
+        <ul class="minuses">
+          <li>$16,000 — вдвое дороже запуска (март 2025: $8,565): GDDR7-дефицит бьёт по этой карте сильнее всех</li>
+          <li>За эти деньги — 8× б/у 3090 (192 ГБ) или Mac Studio M5 Ultra с лучшим $/ГБ</li>
+          <li>GeForce-драйвер vs Enterprise: часть софта (unsloth) официально не поддерживается</li>
+          <li>Для частного лица окупаемость сомнительна: 4× Arc B70 дают те же 128 ГБ за $3,800</li>
+        </ul>
+        <div class="fit-line"><b>Берите, если:</b> это рабочий инструмент с бизнес-обоснованием (приватность, SLA, 24/7 инференс 120B-моделей) — или очень хобби-богатый энтузиаст. Частнику в сентябре 2026 — нет.</div>
+      </div>
+
+      <div class="gpu-card">
+        <div class="gpu-head">
+          <div><h3>Strix Halo (mini-PC, 128 ГБ)</h3><div class="sub">Ryzen AI Max+ 395 · unified LPDDR5X-8000 · ~200 Вт</div></div>
+          <div class="gpu-price"><div class="p">$1,800–2,400</div><div class="s">Framework Desktop / GMKtec EVO-X2</div></div>
+        </div>
+        <div class="gpu-stats">
+          <div class="stat"><div class="l">Память</div><div class="v">128 ГБ / ~212 ГБ/с</div></div>
+          <div class="stat"><div class="l">Llama 4 Scout MoE</div><div class="v">10–20 t/s</div></div>
+          <div class="stat"><div class="l">70B dense Q4</div><div class="v">3–5 t/s</div></div>
+          <div class="stat"><div class="l">Потребление</div><div class="v">~140 Вт</div></div>
+        </div>
+        <div class="pm-label p">Плюсы</div>
+        <ul class="pluses">
+          <li>128 ГБ памяти за $2K — лучший $/ГБ среди «новых» систем: gpt-oss-120b, Qwen3.5-122B, Mistral Medium 128B — всё влезает</li>
+          <li>MoE-модели — его стихия: Llama 4 Scout (17B активных) на 10–20 tok/s, комфортно</li>
+          <li>Мини-ПК: 1.2 л, ~140 Вт под нагрузкой, тишина — «сервер» на полке</li>
+          <li>Vulkan llama.cpp на Strix Halo быстрее ROCm — забавный поворот 2026 года</li>
+        </ul>
+        <div class="pm-label m">Минусы</div>
+        <ul class="minuses">
+          <li>212 ГБ/с убивает dense-модели: 70B Q4 — 3–5 tok/s, это batch-only</li>
+          <li>Только MoE-ворклоады: планирование должно быть «MoE-first», иначе разочарование</li>
+          <li>Апгрейда нет: что купил — то навсегда (память распаяна)</li>
+          <li>Игры/3D — посредственно; это специализированный AI-бокс, не универсальный ПК</li>
+        </ul>
+        <div class="fit-line"><b>Берите, если:</b> ваш профиль — большие MoE с рассуждениями, а не dense-скорость; важны тишина и экономия энергии. Идеальная вторая машина к десктопу с GPU.</div>
+      </div>
+
+      <div class="gpu-card">
+        <div class="gpu-head">
+          <div><h3>Tesla P40 (б/у)</h3><div class="sub">Pascal 2016 · 24 ГБ GDDR5 · пассивный кулер</div></div>
+          <div class="gpu-price"><div class="p">$240–350</div><div class="s">eBay/б/у, сент. 2026</div></div>
+        </div>
+        <div class="gpu-stats">
+          <div class="stat"><div class="l">Память</div><div class="v">24 ГБ / 347 ГБ/с</div></div>
+          <div class="stat"><div class="l">8B Q4</div><div class="v">~35 t/s</div></div>
+          <div class="stat"><div class="l">$ / ГБ</div><div class="v">~$13</div></div>
+          <div class="stat"><div class="l">FP16</div><div class="v">1/64 FP32 (!)</div></div>
+        </div>
+        <div class="pm-label p">Плюсы</div>
+          <ul class="pluses">
+          <li>Самые дешёвые 24 ГБ в мире: $10–15/ГБ — втрое дешевле б/у 3090</li>
+          <li>Q4-инференс не требует tensor cores: 14B Q4 на ~10–12 t/s, embeddings/batch — без проблем</li>
+          <li>gpt-oss-120b в 4×P40-сборках: ~28 t/s (MoE прощает слабую полосу активных слоёв)</li>
+          <li>Господин б/у-хомелаб: серверный форм-фактор, 250 Вт, бесконечные мануалы сообщества</li>
+        </ul>
+        <div class="pm-label m">Минусы</div>
+        <ul class="minuses">
+          <li>Поддержка NVIDIA заканчивается: CUDA 13 / 580-драйвер — последний, 2016-архитектура</li>
+          <li>FP16 = 1/64 FP32: никакой fine-tuning, никакие новые движки, только Q4-Q8 инференс</li>
+          <li>Пассивное охлаждение: нужен турбина-блашер или 3D-принт-шрауд, иначе троттлинг</li>
+          <li>347 ГБ/с = интерактив на грани: 8B — 35 t/s, 14B — терпимо, 27B — слайд-шоу</li>
+        </ul>
+        <div class="fit-line"><b>Берите, если:</b> это вторая машина для batch/embeddings/экспериментов за $300, а не основной ПК. Как «единственная карта» — категорически нет, вопреки хайпу r/homelab.</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ================= MODELS 2026 ================= -->
+<section id="models">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-num">07 · Модели</div>
+      <h2>Что запускать в сентябре 2026: модели по VRAM-тирам</h2>
+      <p class="lead">Железо — средство; интеллект — это модели. Ландшафт сентября 2026: Qwen3.6 и Gemma 4 доминируют в consumer-тирах,
+      OpenAI gpt-oss — лучший «фронтир за копейки», Kimi/GLM — вершина, недостижимая локально. Данные: Onyx leaderboard, BenchLM, Unsloth, Pinggy (авг–сент 2026).</p>
+    </div>
+
+    <div class="tier">
+      <div class="tier-head"><span class="vr">16 ГБ</span><span class="t">Лёгкий тир — качество выше ожиданий</span></div>
+      <div class="tier-body">
+        <div class="model-row"><span class="mn">Gemma 4 12B</span><span class="md">Google · dense · мультимодальная, 262K контекст · общий балл 77+ (MMLU-Pro)</span><span class="ms">~7 ГБ Q4</span><span class="ml ml-gemma">Gemma</span></div>
+        <div class="model-row"><span class="mn">gpt-oss-20b</span><span class="md">OpenAI · MoE (3.6B активных) · reasoning с adjustable effort, tool calling · Apache 2.0</span><span class="ms">~14–16 ГБ</span><span class="ml ml-apache">Apache</span></div>
+        <div class="model-row"><span class="mn">Qwen3.5-9B</span><span class="md">Alibaba · dense · сильнейший в классе <10B, 262K контекст</span><span class="ms">~6 ГБ Q4</span><span class="ml ml-apache">Apache</span></div>
+        <div class="model-row"><span class="mn">Phi-4 14B</span><span class="md">Microsoft · dense · математика/рассуждения</span><span class="ms">~9 ГБ Q4</span><span class="ml ml-mit">MIT</span></div>
+      </div>
+    </div>
+
+    <div class="tier">
+      <div class="tier-head"><span class="vr">24 ГБ</span><span class="t">Золотой тир — здесь живёт лучшее соотношение «качество/размер» в 2026</span></div>
+      <div class="tier-body">
+        <div class="model-row"><span class="mn">Qwen3.6-27B</span><span class="md">Alibaba · dense · лучший реалистичный выбор одиночной карты (BenchLM 47.8) · 262K контекст</span><span class="ms">~15–16 ГБ Q4</span><span class="ml ml-apache">Apache</span></div>
+        <div class="model-row"><span class="mn">Gemma 4 31B</span><span class="md">Google · dense · сильнейшая dense-Gemma (BenchLM 52.6), 256K</span><span class="ms">~18–20 ГБ Q4</span><span class="ml ml-gemma">Gemma</span></div>
+        <div class="model-row"><span class="mn">Qwen3.6-35B-A3B</span><span class="md">Alibaba · MoE (3B активных!) · «лучший all-rounder 2026»: качество 35B при скорости 3B · ~20 t/s на 24 ГБ</span><span class="ms">~23 ГБ Q4</span><span class="ml ml-apache">Apache</span></div>
+        <div class="model-row"><span class="mn">gpt-oss-120b (offload)</span><span class="md">OpenAI · MoE · --n-cpu-moe: 25 экспертов в RAM → 10–15 t/s на 24 ГБ-карте. Фронтир-лайт!</span><span class="ms">~16 ГБ на GPU</span><span class="ml ml-apache">Apache</span></div>
+      </div>
+    </div>
+
+    <div class="tier">
+      <div class="tier-head"><span class="vr">32 ГБ</span><span class="t">Плюс к 24 ГБ: комфорт для MoE + длинный контекст</span></div>
+      <div class="tier-body">
+        <div class="model-row"><span class="mn">Qwen3.6-35B-A3B + 128K контекст</span><span class="md">Та же модель, но KV-кэш не душит; 40–60 t/s на RTX 5090</span><span class="ms">~23 ГБ + кэш</span><span class="ml ml-apache">Apache</span></div>
+        <div class="model-row"><span class="mn">Qwen3-Coder-Next 80B</span><span class="md">Alibaba · MoE (3B активных) · агентный кодинг: 30–40 t/s на 32 ГБ (влезает в MXFP4-репаке ~28 ГБ)</span><span class="ms">~28–46 ГБ</span><span class="ml ml-apache">Apache</span></div>
+        <div class="model-row"><span class="mn">Llama 4 Scout 109B</span><span class="md">Meta · MoE (17B активных) · 10M контекст; на 32 ГБ — впритык, скорость скромная</span><span class="ms">~55 ГБ INT4</span><span class="ml ml-gemma">Llama</span></div>
+      </div>
+    </div>
+
+    <div class="tier">
+      <div class="tier-head"><span class="vr">48–64 ГБ</span><span class="t">Порог «фронтир-локально» — 120B-класс целиком в vRAM</span></div>
+      <div class="tier-body">
+        <div class="model-row"><span class="mn">gpt-oss-120b</span><span class="md">OpenAI · MoE (5.1B активных) · SWE 62.4%, reasoning уровнем o4-mini · 25–35 t/s на 2×3090, 45+ на PRO 6000</span><span class="ms">~59 ГБ MXFP4</span><span class="ml ml-apache">Apache</span></div>
+        <div class="model-row"><span class="mn">Nemotron 3 Super 120B-A12B</span><span class="md">NVIDIA · MoE · 1M контекст, reasoning · сильный претендент на «лучший MoE 2026»</span><span class="ms">~64–72 ГБ Q4</span><span class="ml ml-apache">Open</span></div>
+        <div class="model-row"><span class="mn">Qwen3.5-122B-A10B</span><span class="md">Alibaba · MoE · «frontier-ish» общий интеллект, 256K</span><span class="ms">~70 ГБ Q4</span><span class="ml ml-apache">Apache</span></div>
+        <div class="model-row"><span class="mn">Llama 3.3 70B / Qwen2.5-72B dense</span><span class="md">Классика 70B dense Q4 — по-прежнему сильна в коде и знаниях; 30–40 t/s на 2×3090</span><span class="ms">~40–42 ГБ Q4</span><span class="ml ml-gemma">Llama</span></div>
+      </div>
+    </div>
+
+    <div class="tier">
+      <div class="tier-head"><span class="vr">96–128+ ГБ</span><span class="t">Профессиональная лига</span></div>
+      <div class="tier-body">
+        <div class="model-row"><span class="mn">Mistral Medium 3.5 (128B dense)</span><span class="md">Mistral · dense · мультимодальная, многоязычная</span><span class="ms">~80 ГБ Q4</span><span class="ml ml-gemma">Com.</span></div>
+        <div class="model-row"><span class="mn">DeepSeek-V4-Flash 284B</span><span class="md">DeepSeek · MoE (13B активных) · потолок 128 ГБ Strix Halo в 3-bit</span><span class="ms">~110–135 ГБ Q3</span><span class="ml ml-mit">MIT</span></div>
+        <div class="model-row"><span class="mn">GLM-4.7 355B</span><span class="md">Z.ai · MoE · топ MIT-лицензии, SWE 73.8% — 512 ГБ Mac Studio territory</span><span class="ms">~180 ГБ Q4</span><span class="ml ml-mit">MIT</span></div>
+        <div class="model-row"><span class="mn">GLM-5.1/5.2 · Kimi K2.6</span><span class="md">Вершина open-weight (BenchLM 63–65, SWE 80%+) — но 420+ ГБ: только Mac Studio M3 Ultra 512 ГБ или кластер</span><span class="ms">~420 ГБ Q4</span><span class="ml ml-mit">MIT</span></div>
+      </div>
+    </div>
+
+    <p class="note"><b>Тренд года:</b> MoE-архитектуры (малые активные параметры) разрушили старую связку «больше параметров = медленнее».
+    Qwen3.6-35B-A3B отвечает качеством 35B-класса со скоростью 3B-модели — поэтому в 2026 vRAM важнее TFLOPS,
+    а «24 ГБ + хорошая полоса» остаётся золотым тиром, каким был в 2024-м.</p>
+  </div>
+</section>
+
+<!-- ================= SCENARIOS ================= -->
+<section id="scenarios">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-num">08 · Сценарии</div>
+      <h2>Рекомендации по бюджету: от $350 до $16,000</h2>
+      <p class="lead">Пять типовых ситуаций. Цены сентября 2026, США; в других регионах закладывайте +20–60%.</p>
+    </div>
+    <div class="scen">
+      <div class="scen-row">
+        <div class="scen-budget"><div class="b">≈ $350</div><div class="d">максимальный бюджет входа</div></div>
+        <div class="scen-goal"><b>Попробовать LLM локально</b> без кредиток и API. Готовы к компромиссам в скорости.</div>
+        <div class="scen-pick"><div class="n">Tesla P40 · 24 ГБ</div><div class="w">+ блашер-кулер $30. Gemma 4 12B и gpt-oss-20b — работает; 14B Q4 — терпимо. Только как машина-экспериментатор.</div></div>
+      </div>
+      <div class="scen-row">
+        <div class="scen-budget"><div class="b">≈ $900</div><div class="d">новая карта с гарантией</div></div>
+        <div class="scen-goal"><b>Полноценный ежедневный ассистент:</b> Qwen3.6-27B Q4 на интерактивной скорости.</div>
+        <div class="scen-pick"><div class="n">AMD RX 7900 XTX · 24 ГБ</div><div class="w">Лучший $/ГБ среди новых. ROCm 7.2 + llama.cpp Vulkan = стабильные 30–45 t/s на 27B. Бонус: 70B Q4 на 14–18 t/s.</div></div>
+      </div>
+      <div class="scen-row hero-scen">
+        <div class="scen-budget"><div class="b">≈ $1,200</div><div class="d">оптимальная точка рынка ★</div></div>
+        <div class="scen-goal"><b>Лучший баланс:</b> 24 ГБ с честной полосой под топ-модели тира, апгрейд-путь до 48 ГБ.</div>
+        <div class="scen-pick hero-scen-pick"><div class="n">RTX 3090 (б/у) · 24 ГБ</div><div class="w">Qwen3.6-27B Q4 на 28–35 t/s, gpt-oss-20b на 160 t/s, gpt-oss-120b с offload на 10–15 t/s. Через год — вторая 3090.</div></div>
+      </div>
+      <div class="scen-row">
+        <div class="scen-budget"><div class="b">≈ $2,600</div><div class="d">серьёзное железо</div></div>
+        <div class="scen-goal"><b>Максимум качества ответов:</b> 120B-класс reasoning локально, без компромиссов offload.</div>
+        <div class="scen-pick"><div class="n">2× RTX 3090 · 48 ГБ</div><div class="w">gpt-oss-120b целиком на 25–35 t/s. Альтернатива-радикал: 4× Arc Pro B60 (96 ГБ) — если готовы воевать с софтом.</div></div>
+      </div>
+      <div class="scen-row">
+        <div class="scen-budget"><div class="b">≈ $4,700+</div><div class="d">без компромиссов в скорости</div></div>
+        <div class="scen-goal"><b>Скорость решает:</b> агенты, reasoning-модели с тысячами токенов, длинные контексты, prefill без ожидания.</div>
+        <div class="scen-pick"><div class="n">RTX 5090 · 32 ГБ</div><div class="w">Либо, для «максимума интеллекта»: Strix Halo 128 ГБ ($2K, MoE-first) + ваша текущая GPU. Комбо умнее одной 5090.</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FINAL ================= -->
+<section class="final" id="final">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-num">09 · Итог</div>
+      <h2>Идеальный баланс: окончательный ответ</h2>
+    </div>
+    <div class="final-box">
+      <div class="k">Вердикт исследования</div>
+      <h3>Б/у RTX 3090 — идеальный баланс «цена / скорость / качество» сентября 2026.</h3>
+      <p>
+        Сбалансированная GPU для локального LLM — это не «самая быстрая» и не «самая дешёвая». Это карта, где три кривые пересекаются в оптимуме:
+        <b>скорость</b> (полоса 936 ГБ/с даёт 28–35 t/s на моделях 27B-класса и 160 t/s на gpt-oss-20b — комфортно выше порога интерактивности в 25 t/s),
+        <b>качество</b> (24 ГБ — точный размер под сильнейшие модели consumer-тира: Qwen3.6-27B, Gemma 4 31B, и gpt-oss-120b в режиме offload),
+        и <b>цена</b> (~$52/ГБ — втрое дешевле RTX 5090, при этом б/у 3090 не потеряет стоимость: она уже «в дне»).
+      </p>
+      <p>
+        Решающий аргумент 2026 года — рынок. В нормальные времена я бы советовал RTX 5090 за $2,000 MSRP: она объективно вдвое быстрее 3090.
+        Но по $4,700+ она перестаёт быть «балансом»: за её цену собирается 2× 3090 (48 ГБ) + весь бюджет электричества на год.
+        <b>Кризис памяти инвертировал рейтинг выгодности:</b> б/у Ampere и нестандартные игроки (RX 7900 XTX, Arc Pro, Strix Halo) сегодня рациональнее новых флагманов.
+      </p>
+      <p>
+        Стратегия на 12 месяцев: <b>купить одну 3090 сейчас</b>, жить на 27B-классе и gpt-oss-20b (это покрывает 95% задач),
+        наблюдать за ценами GDDR7 (прогнозы сходятся: нормализация не раньше конца 2027),
+        и <b>докупить вторую 3090 → 48 ГБ</b>, когда появится реальная потребность в 120B-моделях целиком.
+        Это дешевле, быстрее и умнее, чем платить $4,700 за одну 5090 в самый разгар пузыря.
+      </p>
+      <div class="final-nums">
+        <div class="fnum"><div class="l">Цена входа</div><div class="v">$1,000–1,300</div></div>
+        <div class="fnum"><div class="l">$ / ГБ vRAM</div><div class="v">~$52</div></div>
+        <div class="fnum"><div class="l">Целевые модели</div><div class="v">27B–120B MoE</div></div>
+        <div class="fnum"><div class="l">Скорость на цели</div><div class="v">28–35 t/s</div></div>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="pcard">
+        <h3>🚫 Чего избегать в сентябре 2026</h3>
+        <p>• <b>16 ГБ NVIDIA за $700–1,100</b> (5060 Ti 16GB, 5070 Ti): +39% к цене полугодом ранее и потолок 14B — худшая $/ценность на рынке.<br>
+        • <b>RTX 5090 по $4,700+</b> — если только скорость не приносит вам деньги.<br>
+        • <b>PRO 6000 по $16,000</b> — частнику не оправдать.<br>
+        • <b>P40 как единственная карта</b> — дешёвый VRAM, дорогие нервы.<br>
+        • Любая карта <b>менее 16 ГБ</b> — в 2026 это не LLM-железо.</p>
+      </div>
+      <div class="pcard">
+        <h3>🔮 Что может изменить расклад</h3>
+        <p>• <b>Нормализация цен DRAM</b> (конец 2027): 5090 вернётся к ~$2.5K — вот тогда апгрейд.<br>
+        • <b>RTX 50 Super</b> «готовы, но в подвешенном состоянии» (июль 2026): 24 ГБ-варианты могут выйти и сместить 3090.<br>
+        • <b>ROCm 7.3+ и SYCL</b>: если Intel/AMD дожмут софт-стек, их $/ГБ станет неуязвимым.<br>
+        • <b>MoE-модели 2027</b>: если тренд «мало активных параметров» продолжится, полоса станет менее критичной — и Arc Pro B70-связки взлетят.<br>
+        • <b>M5 Ultra Mac</b> (конец 2026?): 1,200+ ГБ/с unified — сильный кандидат на «большой MoE-бокс».</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= SOURCES ================= -->
+<section id="sources">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-num">10 · Прозрачность</div>
+      <h2>Методология и источники</h2>
+      <p class="lead">Все цифры в отчёте — из публичных источников, доступных на 9 сентября 2026. Бенчмарки single-user (llama.cpp/Ollama) если не указано иное; vLLM-цифры отражают batch-режим.</p>
+    </div>
+    <div class="grid2" style="margin-bottom: 24px">
+      <div class="pcard">
+        <h3>Как собирались данные</h3>
+        <p>Метасёрч по 6 тематическим срезам (GPU-гайды 2026, бенчмарки llama.cpp, цены street/б/у, MoE-модели, лидерборды LLM, Intel Arc),
+        ~180 первичных страниц, чтение топ-источников, кросс-проверка каждой ключевой цифры минимум в двух независимых источниках.
+        Расхождения (например, 5090 на 8B: 130 vs 220 t/s в разных тестах) отражены диапазонами.</p>
+      </div>
+      <div class="pcard">
+        <h3>Главные оговорки</h3>
+        <p>• Цены волатильны: сентябрьские цифры могут отличаться от ваших локальных на ±30%.<br>
+        • tok/s зависит от quant (Q4_K_M), контекста, движка (llama.cpp vs vLLM: разрыв до 19×) и ОС.<br>
+        • «BenchLM score» и MMLU-баллы — прокси качества, не абсолютная истина.<br>
+        • Б/у-цены — eBay/Avito-медианы, разброс реальных сделок большой.</p>
+      </div>
+    </div>
+    <ul class="sources">
+      <li><a href="https://bizon-tech.com/blog/best-gpu-llm-training-inference" rel="noopener">BIZON — Best GPU for LLM Inference and Training 2026</a> (май 2026, верификация VRAM-требований)</li>
+      <li><a href="https://www.spheron.network/blog/best-nvidia-gpus-for-llms/" rel="noopener">Spheron — Best NVIDIA GPUs for LLMs 2026</a> (обновл. 8 сент 2026, ставки аренды)</li>
+      <li><a href="https://www.spheron.network/blog/rent-nvidia-rtx-5090/" rel="noopener">Spheron — RTX 5090 LLM Benchmarks: Cost Per Million Tokens</a> (обновл. 7 сент 2026)</li>
+      <li><a href="https://gigagpu.com/tokens-per-second-benchmark/" rel="noopener">GIGAGPU — Tokens/sec Benchmark</a> (усреднённые tok/s по 13 GPU)</li>
+      <li><a href="https://github.com/ggml-org/llama.cpp/discussions/15396" rel="noopener">llama.cpp Discussion #15396 — running gpt-oss</a> (первичные llama-bench: 3090, PRO 6000, offload-конфиги)</li>
+      <li><a href="https://julsimon.medium.com/what-to-buy-for-local-llms-april-2026-a4946a381a6a" rel="noopener">Julien Simon — What to Buy for Local LLMs (April 2026)</a> (тиры и полосы, Mac-кластеры)</li>
+      <li><a href="https://bhavishyapandit9.substack.com/p/best-local-llm-for-every-hardware-tier" rel="noopener">WTF In Tech — Your GPU Determines Your LLM</a> (hardware-тиры, пороги интерактивности)</li>
+      <li><a href="https://www.compute-market.com/blog/best-amd-gpu-local-llm-inference-2026" rel="noopener">Compute Market — Best AMD GPU for Local LLM 2026</a> (ROCm 7.2, RX 7900 XTX: 70B на 14–18 t/s)</li>
+      <li><a href="https://www.pugetsystems.com/labs/articles/intel-arc-pro-b70-multi-gpu-ai-inference-performance/" rel="noopener">Puget Systems — Intel Arc Pro B70 Multi-GPU AI Inference</a> (июнь 2026, 4×B70, vLLM/oneCCL)</li>
+      <li><a href="https://openclawdc.com/blog/tesla-p40-local-llm-worth-it/" rel="noopener">OpenClaw DC — Tesla P40 for Local LLMs</a> (авг 2026, б/у-цены и ограничения)</li>
+      <li><a href="https://www.tomshardware.com/pc-components/gpus/lowest-gpu-prices-tracking" rel="noopener">Tom's Hardware — GPU price tracking 2026</a> (обновл. 3 сент 2026, трекинг розницы)</li>
+      <li><a href="https://www.techspot.com/article/3152-gpu-pricing-mid-2026/" rel="noopener">TechSpot — Absurd GPU Pricing Update: Mid-2026</a> (региональные цены, динамика)</li>
+      <li><a href="https://tech-insider.org/nvidia-gpu-price-hike-rtx-50-series-2026/" rel="noopener">Tech-Insider — RTX 50-Series Jumps 39%</a> (июнь–август 2026, Newegg-медианы)</li>
+      <li><a href="https://www.thundercompute.com/blog/nvidia-rtx-pro-6000-pricing" rel="noopener">Thunder Compute — RTX PRO 6000 Pricing</a> (4 сент 2026: $16,000 офиц.)</li>
+      <li><a href="https://onyx.app/self-hosted-llm-leaderboard" rel="noopener">Onyx AI — Self-Hosted LLM Leaderboard</a> (июль 2026, VRAM-требования моделей)</li>
+      <li><a href="https://benchlm.ai/best/local-llm" rel="noopener">BenchLM — Best Local LLMs, September 2026</a> (вериф. 8 сент 2026, оценки моделей)</li>
+      <li><a href="https://pinggy.io/blog/top_5_local_llm_tools_and_models/" rel="noopener">Pinggy — Top Local LLM Tools & Models 2026</a> (авг 2026, размеры Q4 актуальных MoE)</li>
+      <li><a href="https://www.layer3labs.io/guides/best-local-llms" rel="noopener">Layer3 Labs — Best Local LLMs 2026</a> (лицензии, VRAM-правила)</li>
+      <li><a href="https://blogs.nvidia.com/blog/rtx-ai-garage-openai-oss/" rel="noopener">NVIDIA Blog — gpt-oss on RTX GPUs</a> (офиц. оптимизации, 256 t/s claim)</li>
+      <li><a href="https://news.ycombinator.com/item?id=47885644" rel="noopener">Hacker News — Intel Arc Pro B70 Review, обсуждение</a> (полевые отчёты llama.cpp на Arc)</li>
+    </ul>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>Составлено 9 сентября 2026 · все данные — публичные источники на дату отчёта · цены USD (рынок США)</p>
+    <p class="dis">Дисклеймер: этот отчёт — исследовательский обзор, не финансовый совет. GPU-рынок сентября 2026 экстремально волатилен:
+    перед покупкой перепроверяйте локальные цены. Все торговые марки принадлежат их владельцам.</p>
+  </div>
+</footer>
+
+<script>
+  // ---------- Master table sorting ----------
+  (function () {
+    const table = document.getElementById('masterTable');
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    let currentKey = 'idx';
+    let currentAsc = true;
+
+    const btns = document.querySelectorAll('.btn-sort');
+    const ths = table.querySelectorAll('th');
+
+    function num(v) { return parseFloat(v) || 0; }
+
+    function sort(key, asc) {
+      const sorted = [...rows].sort((a, b) => {
+        const va = num(a.dataset[key]);
+        const vb = num(b.dataset[key]);
+        if (va !== vb) return asc ? va - vb : vb - va;
+        return num(a.dataset.idx) - num(b.dataset.idx);
+      });
+      sorted.forEach(r => tbody.appendChild(r));
+    }
+
+    function setActive(key, asc) {
+      btns.forEach(b => b.classList.toggle('active', b.dataset.key === key && asc));
+      ths.forEach(th => {
+        th.classList.toggle('sorted', th.dataset.k === key);
+        const arrow = th.querySelector('.arrow');
+        if (arrow) arrow.textContent = th.dataset.k === key ? (asc ? '▲' : '▼') : '';
+      });
+    }
+
+    btns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        currentKey = btn.dataset.key;
+        currentAsc = true;
+        sort(currentKey, true);
+        setActive(currentKey, true);
+      });
+    });
+
+    ths.forEach(th => {
+      if (!th.dataset.k || th.dataset.k === 'gpu') return;
+      th.addEventListener('click', () => {
+        const k = th.dataset.k;
+        if (k === currentKey) { currentAsc = !currentAsc; } else { currentKey = k; currentAsc = true; }
+        sort(currentKey, currentAsc);
+        setActive(currentKey, currentAsc);
+      });
+    });
+  })();
+
+  // ---------- Smooth in-page anchors ----------
+  document.querySelectorAll('a[href^="#"]').forEach(a => {
+    a.addEventListener('click', e => {
+      const el = document.querySelector(a.getAttribute('href'));
+      if (el) { e.preventDefault(); el.scrollIntoView({ behavior: 'smooth' }); }
+    });
+  });
+</script>
+</body>
+</html>

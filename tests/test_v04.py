@@ -58,9 +58,25 @@ class RenderSettingsTest(unittest.TestCase):
 
     def test_brave_key_appends_engine_block(self):
         out = render_settings(_BASE, env={"BATHYS_ENGINE_BRAVE_KEY": "key123"})
-        for needle in ("engines:", "name: brave", "engine: brave",
+        for needle in ("engines:", "name: braveapi", "engine: braveapi",
                        "api_key: key123", "inactive: false"):
             self.assertIn(needle, out)
+        # the scraper module must NOT receive the key (it would ignore it)
+        self.assertNotIn("engine: brave\n", out)
+
+    def test_exa_and_yandex_keys_render_engines(self):
+        out = render_settings(_BASE, env={
+            "BATHYS_ENGINE_EXA_KEY": "exak",
+            "BATHYS_ENGINE_YANDEX_KEY": "ydxk",
+            "BATHYS_ENGINE_YANDEX_FOLDER": "folder-1",
+        })
+        self.assertIn("name: exaapi", out)
+        self.assertIn("engine: exaapi", out)
+        self.assertIn("api_key: exak", out)
+        self.assertIn("name: yandex_api", out)
+        self.assertIn("yandex_folder_id: folder-1", out)
+        # single engines block for multiple keys
+        self.assertEqual(out.count("engines:"), 1)
         # base lines survive intact, before the injected section
         self.assertLess(out.index("use_default_proxy: false"), out.index("engines:"))
         self.assertLess(out.index("    - json"), out.index("engines:"))
