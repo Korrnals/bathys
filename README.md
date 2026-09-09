@@ -7,7 +7,7 @@
 Сонар находит координаты, батискаф ныряет за полными текстами, дистиллятор поднимает на палубу только то, что отвечает на вопрос.
 
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
-![version](https://img.shields.io/badge/version-0.8.0-9cf)
+![version](https://img.shields.io/badge/version-0.9.0-9cf)
 ![mcp](https://img.shields.io/badge/MCP-stdio%20server-6f42c1)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
@@ -145,7 +145,7 @@ Bathys — stdio MCP-сервер: блок `mcpServers` один и тот же
 |---|---|
 | `deep_research(query, max_sources=3, …)` | ищет, параллельно читает топ-источники, возвращает слитый дистиллят под запрос. Первый вызов для любого ресёрч-вопроса. |
 | `web_search(query, max_results=8, …)` | ранжированный список ссылок со сниппетами без содержимого страниц; `as_json=true` — чистый JSON для программ. |
-| `read_url(url, query=None, max_chars=8000)` | читает одну страницу; с `query` — только релевантные пассажи. |
+| `read_url(url, query=None, find=None)` | читает страницу (включая текстовые PDF); с `query` — релевантные пассажи; с `find` — точный поиск по кэшу сырца без сети. |
 | `read_urls(urls, query=None, total_chars=12000)` | пакетно читает до 10 известных страниц; бюджет делится между успешными, сбой страницы — одна строка, не сорванный вызов. |
 
 Поиск сужается общими фильтрами `time_range`, `category`, `engines`, `language`. Живой футер ответа показывает сжатие и кэш: `[bathys: 41 raw hits, top 3 considered · dove 3 pages · 35669 ch fetched → 7508 ch returned · 3.2s]`.
@@ -184,7 +184,7 @@ Bathys — stdio MCP-сервер: блок `mcpServers` один и тот же
 
 ## 📍 Статус
 
-**0.8.0.** Выпускная история: v0.2 «Качество выдачи» (ретраи, здоровье движков), v0.3 «Паритет с Tavily» (`read_urls`, JSON-режим), v0.4 «Эксплуатация» (robots-этика, метрики, `bathys-doctor`), v0.5 «Identity & Harness» (репозиционирование, промпты, субагент), v0.6 «Native Install» (`bathys install`), v0.7 «Ship & Setup» (двухъярусное извлечение, `bathys setup`, однострочник, uninstall) — итоги в [CHANGELOG.md](CHANGELOG.md).
+**0.9.0.** Выпускная история: v0.2 «Качество выдачи» (ретраи, здоровье движков), v0.3 «Паритет с Tavily» (`read_urls`, JSON-режим), v0.4 «Эксплуатация» (robots-этика, метрики, `bathys-doctor`), v0.5 «Identity & Harness» (репозиционирование, промпты, субагент), v0.6 «Native Install» (`bathys install`), v0.7 «Ship & Setup» (двухъярусное извлечение, `bathys setup`, однострочник, uninstall) — итоги в [CHANGELOG.md](CHANGELOG.md).
 
 Репозиторий: `github.com/Korrnals/bathys`. Пакет опубликован: [PyPI `bathys`](https://pypi.org/project/bathys/) (pip install), однострочник установки — выше. До 1.0: публикация npm-обёртки `bathys-mcp` и первый прогон Docker-образа; CI (matrix 3.10–3.12 + shellcheck) уже в репозитории.
 

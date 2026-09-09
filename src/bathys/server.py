@@ -174,6 +174,7 @@ async def read_url(
     query: str | None = None,
     max_chars: int = 8000,
     refresh: bool = False,
+    find: str | None = None,
     ctx: Context = None,
 ) -> str:
     """Read one web page; return its main content as clean, budgeted markdown.
@@ -187,8 +188,12 @@ async def read_url(
         query: optional focus; return only passages relevant to it
         max_chars: output character budget (300-50000)
         refresh: ignore cache and re-fetch the page
+        find: search the cached RAW text for this exact substring (case-insensitive):
+            returns matches with counters and context, no network needed. Requires
+            the page to have been read before; combine with query for first reads.
     """
-    return await _engine(ctx).read(url, query=query, max_chars=max_chars, refresh=refresh)
+    return await _engine(ctx).read(url, query=query, max_chars=max_chars,
+                                   refresh=refresh, find=find)
 
 
 @mcp.tool(annotations=ToolAnnotations(

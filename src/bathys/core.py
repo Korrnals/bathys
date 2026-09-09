@@ -4,6 +4,7 @@ so scripts and tests can drive it without MCP framing."""
 from __future__ import annotations
 
 import asyncio
+import re
 import time
 from dataclasses import dataclass
 
@@ -152,10 +153,21 @@ class Engine:
             self._search_ts = time.monotonic()
 
     def _record_health(self, outcome: searx.SearchOutcome) -> None:
-        """F-102: consecutive-failure streak per engine; any hit resets it."""
+        """F-102: consecutive-failure streak per engine; any hit resets it.
+        v0.9: failure reasons are now TYPED (borrowed from pi-web-access's
+        fallbackOn design) — captcha engines get a longer memory than timeout
+        engines, because captchas don't heal in seconds."""
         for e in outcome.unresponsive:
-            name = e.split(":")[0]
-            self._engine_fails[name] = self._engine_fails.get(name, 0) + 1
+            parts = e.split(":", 1)
+            name = parts[0]
+            reason = (parts[1] if len(parts) > 1 else "").lower()
+            if "captcha" in reason or "suspended" in reason:
+                weight = 3  # captcha: sticky condition, counts triple
+            elif "timeout" in reason:
+                weight = 1  # timeout: transient, counts as-is
+            else:
+                weight = 2  # quota/network/unknown
+            self._engine_fails[name] = self._engine_fails.get(name, 0) + weight
         for h in outcome.hits:
             for name in h.engines:
                 self._engine_fails.pop(name, None)
@@ -331,8 +343,46 @@ class Engine:
         distilled = distill.passages(slim, query, max_chars)
         return ReadResult(page=page, distilled=distilled, cache_hit=hit)
 
+    def _find_in_cache(self, url: str, pattern: str, *, limit: int = 3,
+                       context: int = 160) -> str:
+        """find-text over the cached RAW page (borrowed from pi-web-access's
+        get_search_content/findText): exact substring search, no network,
+        match counters and local context. Cache miss -> honest error."""
+        pk = Cache.key("page", url)
+        got, stored = self.cache.get(pk)
+        if not got:
+            return f"[bathys: find — нет кэша для {url}; сначала read_url]"
+        if "error" in stored:
+            return f"[bathys: find — в кэше ошибка: {stored['error']}]"
+        text = stored.get("text", "")
+        low, pl = text.lower(), pattern.lower()
+        positions: list[int] = []
+        i = low.find(pl)
+        while i != -1 and len(positions) < 50:
+            positions.append(i)
+            i = low.find(pl, i + 1)
+        if not positions:
+            return (f"[bathys: find '{pattern}' — 0 совпадений в кэше "
+                    f"({len(text)} ch); попробуй read_url с query]")
+        total = len(positions)
+        shown = positions[:limit]
+        blocks = []
+        for n, pos in enumerate(shown, 1):
+            lo = max(0, pos - context)
+            hi = min(len(text), pos + len(pattern) + context)
+            frag = ("…" if lo else "") + text[lo:hi] + ("…" if hi < len(text) else "")
+            frag = re.sub(r"\s+", " ", frag)
+            blocks.append(f"{n}. @{pos}: …{frag}…")
+        return (f"[bathys: find '{pattern}' — {total} совпадений(я), показано {len(shown)} "
+                f"(кэш сырца, без сети)\n" + "\n".join(blocks))
+
     async def read(self, url: str, *, query: str | None = None, max_chars: int = 8000,
-                   refresh: bool = False) -> str:
+                   refresh: bool = False, find: str | None = None) -> str:
+        if find is not None:
+            out = self._find_in_cache(url, find)
+            self._log_metrics("read_url", cache="HIT", chars_in=0,
+                              chars_out=len(out), secs=0.0, url=url)
+            return out
         started = time.monotonic()
         try:
             res = await self._read(url, query=query, max_chars=max_chars, refresh=refresh)

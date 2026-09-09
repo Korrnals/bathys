@@ -54,6 +54,10 @@ _COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
 _TAG_RE = re.compile(r"<[^>]+>")
 _TITLE_RE = re.compile(r"<title\b[^>]*>(.*?)</title>", re.S | re.I)
 _WS_RE = re.compile(r"\s+")
+class _FinalTierError(RuntimeError):
+    """Tier-1 error that must NOT escalate to the browser tier."""
+
+
 _APP_ROOT_RE = re.compile(
     r"<body[^>]*>\s*(<div[^>]*id=[\"']?(app|root|__next|__nuxt)[\"']?[^>]*>\s*"
     r"(</div>)?\s*</body>)", re.I)
@@ -79,6 +83,23 @@ def _looks_like_js_shell(html: str, text: str) -> bool:
         return False
     # tiny text with heavy markup hints a loader screen
     return len(text) < 200
+
+
+def _pdf_text(content: bytes) -> str | None:
+    """Extract the text layer from PDF bytes; None when there is no text."""
+    try:
+        import pymupdf  # optional dependency, lazy import
+    except ImportError:
+        raise _FinalTierError(
+            "crawl failed: PDF support needs `pip install pymupdf` (local, no ML)")
+    try:
+        doc = pymupdf.open(stream=content, filetype="pdf")
+        parts = [page.get_text() for page in doc]
+        doc.close()
+    except Exception as e:
+        raise RuntimeError(f"crawl failed: pdf parse error ({e.__class__.__name__})")
+    text = "\n\n".join(parts).strip()
+    return text if len(text) >= 40 else None  # <40 chars => likely a scan
 
 
 class Crawler:
@@ -161,8 +182,22 @@ class Crawler:
         ctype = resp.headers.get("content-type", "")
         if resp.status_code >= 400:
             raise RuntimeError(f"crawl failed: http {resp.status_code}")
+        if "pdf" in ctype or url.lower().endswith(".pdf"):
+            # PDF text layer (v0.9, borrowed from pi-web-access's PDF handling):
+            # local extraction via pymupdf — no ML, no cloud, no OCR. Scanned
+            # PDFs (no text layer) fail honestly and stay out of scope until
+            # the paused OCR initiative is revived.
+            text = _pdf_text(resp.content)
+            if text is None:
+                raise _FinalTierError(
+                    "crawl failed: PDF has no text layer (scanned?) — OCR initiative is paused")
+            return (
+                Page(url=str(resp.url), status=resp.status_code, title="",
+                     text=text, raw_chars=len(resp.content), tier="http-pdf"),
+                "",
+            )
         if "html" not in ctype and "xml" not in ctype and ctype:
-            # non-HTML (pdf/json/etc) — not tier-1 material
+            # non-HTML (json/etc) — not tier-1 material
             raise RuntimeError(f"crawl failed: unsupported content-type {ctype.split(';')[0]}")
         html = resp.text
         title_m = _TITLE_RE.search(html)
@@ -183,14 +218,20 @@ class Crawler:
         if mode == "off":
             page, _ = await self._fetch_http(url, http)
             return page
-        # auto: try tier 1, escalate to tier 2 on JS-shell or failure
+        # auto: try tier 1, escalate to tier 2 on JS-shell or failure.
+        # PDF errors are FINAL (final): a headless browser on a PDF just hits
+        # "Download is starting" — escalating would mask the honest message.
         try:
             page, html = await self._fetch_http(url, http)
+        except _FinalTierError:
+            raise
         except RuntimeError:
             if mode == "auto":
                 return await self._fetch_browser(url)
             raise
-        if not _looks_like_js_shell(html, page.text):
+        # PDF/extracted-content pages return empty raw html by design —
+        # that is NOT a JS shell; skip the heuristic and return as-is.
+        if page.tier != "http" or not _looks_like_js_shell(html, page.text):
             return page
         return await self._fetch_browser(url)
 
