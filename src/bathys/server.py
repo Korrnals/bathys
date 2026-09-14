@@ -213,6 +213,7 @@ async def library_docs(
     query: str,
     max_chars: int = 6000,
     refresh: bool = False,
+    subpages: int = 3,
     ctx: Context = None,
 ) -> str:
     """Fetch up-to-date official documentation for a library and distill it under your question.
@@ -226,12 +227,14 @@ async def library_docs(
         query: your concrete question about the library (used for distillation)
         max_chars: output character budget (300-20000)
         refresh: re-fetch the docs page even if cached
+        subpages: when the docs home is navigational, follow this many
+            same-site subpages ranked by query relevance (0 disables)
     """
     from . import library_docs as _ld
 
     eng = _engine(ctx)
     return await _ld.library_docs(eng, library, query, max_chars=max_chars,
-                                  refresh=refresh)
+                                  refresh=refresh, subpages=subpages)
 
 
 @mcp.tool(annotations=ToolAnnotations(
