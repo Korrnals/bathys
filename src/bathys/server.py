@@ -3,14 +3,17 @@
 Owns the whole pipeline (search -> extraction -> query distillation -> cache);
 SearXNG and Crawl4AI are swappable internal engines, not the product.
 
-Four tools, deliberately small surface:
+Five tools, deliberately small surface:
   deep_research(query) — search + read top sources + query-distilled digest;
   web_search(query)    — ranked links only;
   read_url(url, query) — distilled text of one page;
-  read_urls(urls, …)   — batch read of known URLs under one shared budget.
+  read_urls(urls, …)   — batch read of known URLs under one shared budget;
+  library_docs(library, query) — up-to-date library docs distilled under
+  the question (Context7-style, but local and unlimited).
 
-Plus three prompts (bathys_deep_research, bathys_source_audit,
-bathys_fresh_scan) — built-in research strategies the harness can render.
+Plus four prompts (bathys_deep_research, bathys_source_audit,
+bathys_fresh_scan, bathys_find_docs) — built-in research strategies the
+harness can render.
 """
 
 from __future__ import annotations
@@ -43,6 +46,10 @@ mcp = FastMCP(
         "поиск → извлечение → дистилляция → кэш целиком на вашей машине, ноль "
         "облачных квот и API-ключей.\n\n"
         "Матрица выбора инструмента:\n"
+        "- вопрос о библиотеке/фреймворке/API/CLI → library_docs(library, "
+        "query=…) — первым, не web_search/deep_research: тренировочные "
+        "данные устаревают, доки — первоисточник; уточняющий вопрос по той "
+        "же либе — снова library_docs (кэш сырца: повтор бесплатен);\n"
         "- исследовательский вопрос («что/как/почему/сравни») → "
         "deep_research(query): ищет, читает топ-источники, возвращает "
         "дистиллят под запрос;\n"
@@ -76,8 +83,8 @@ mcp = FastMCP(
         "- футер \"[bathys: …]\" — статистика (cache/secs/ch), не для "
         "цитирования.\n\n"
         "Готовые стратегии — промпты bathys_deep_research, "
-        "bathys_source_audit, bathys_fresh_scan. Цитируй URL источников из "
-        "секций ответов — это твой след аудита."
+        "bathys_source_audit, bathys_fresh_scan, bathys_find_docs. Цитируй "
+        "URL источников из секций ответов — это твой след аудита."
     ),
     lifespan=_lifespan,
 )
@@ -364,6 +371,40 @@ def bathys_fresh_scan(topic: str, window: str = "week") -> str:
 помечай «по данным одного источника»."""
 
 
+@mcp.prompt(description="Документация библиотеки под вопросом: актуальные "
+                        "доки из первоисточника за один вызов library_docs, "
+                        "дистилляция под вопрос, ответ с URL-цитатами.")
+def bathys_find_docs(library: str, question: str) -> str:
+    """Документация библиотеки под вопросом: library_docs + переформулировка при пустоте.
+
+    Args:
+        library: имя библиотеки, например "fastapi", "react", "postgresql"
+        question: конкретный вопрос о библиотеке (что искать в доках)
+    """
+    return f"""# Документация: {library} — {question}
+
+Тренировочные данные устаревают: сигнатуры, опции и версии проверяй по
+докам первоисточника, не по памяти.
+
+1. Заход: library_docs(library="{library}", query="{question}") — один
+   вызов: резолв док-сайта, чтение, дистилляция под вопрос. Без
+   предварительного web_search.
+2. Разбор дистиллята: отвечает ли на вопрос; навигационный (меню вместо
+   содержания) или пустой — переформулируй query одним концептом
+   конкретнее («auth» → «как настроить JWT-аутентификацию») и повтори.
+   Уточняющий вопрос по той же либе — снова library_docs: сырец в кэше,
+   повтор мгновенный и бесплатный.
+3. Максимум 3 попытки; после — deep_research("{library} {question}") по
+   док-страницам, не шестой заход.
+4. Ответ: вывод первым предложением, у каждого нетривиального факта —
+   URL док-сайта (шапка ответа library_docs); сигнал футера
+   «повторы бесплатны» — используй: уточняй запросом, а не догадкой.
+5. Отказ-паттерн: library_docs не смог (сеть, «не удалось найти
+   документацию», пусто после 3 попыток) — скажи об этом явно и отвечай
+   из памяти с оговоркой «ответ из тренировочных данных, может быть
+   устаревшим»."""
+
+
 def _describe_prompt_args(*names: str) -> None:
     """Fill PromptArgument.description from each prompt docstring's Args section.
 
@@ -392,6 +433,7 @@ def _describe_prompt_args(*names: str) -> None:
 
 _describe_prompt_args(
     "bathys_deep_research", "bathys_source_audit", "bathys_fresh_scan",
+    "bathys_find_docs",
 )
 
 

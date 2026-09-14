@@ -40,7 +40,8 @@ async def main() -> None:
                     req = "required" if arg.required else "optional"
                     print(f"    arg {arg.name} ({req}): {arg.description}")
             assert {p.name for p in prompts.prompts} >= {
-                "bathys_deep_research", "bathys_source_audit", "bathys_fresh_scan"
+                "bathys_deep_research", "bathys_source_audit", "bathys_fresh_scan",
+                "bathys_find_docs",
             }, "expected Bathys strategy prompts are missing"
 
             rendered = await session.get_prompt(
