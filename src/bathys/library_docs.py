@@ -89,13 +89,15 @@ def _normalize(name: str) -> str:
     return (name or "").strip().lower().lstrip("/").rstrip("/")
 
 
-async def resolve_docs_url(engine, library: str) -> tuple[str, str]:
+async def resolve_docs_url(engine, library: str, query: str | None = None) -> tuple[str, str]:
     """Return (docs_url, source) for a library name.
 
     source: 'index' | 'user-index' | 'search' | 'github' — provenance for the
     answer header. Resolution priority: seed index -> user-grown index ->
-    one live web_search -> GitHub slug guess. Raises RuntimeError when
-    nothing plausible is found.
+    one live web_search -> GitHub slug guess. `query` disambiguates same-name
+    projects on the search fallback (QA-audit finding: bare 'trio' resolved to
+    a diabetes app; scoring the candidate URL/snippet against query terms
+    picks the right one). Raises RuntimeError when nothing plausible is found.
     """
     key = _normalize(library)
     seed = _seed_index()
@@ -112,19 +114,43 @@ async def resolve_docs_url(engine, library: str) -> tuple[str, str]:
     # live search fallback: one web_search call
     raw = await engine.search(f"{library} official documentation", max_results=5, refresh=False)
     lines = raw.splitlines()
+    candidates: list[tuple[str, str]] = []  # (url, context) — context for scoring
     for ln in lines:
         s = ln.strip()
         if s.startswith("http://") or s.startswith("https://"):
             low = s.lower()
             if any(b in low for b in ("docs.", "/docs", "documentation.", "developer.",
                                       "github.com/")):
-                url = s.split()[0]
-                # phase 3b: remember search-found docs sites in the user
-                # index, so the next call for the same library skips the
-                # network entirely. GitHub slug guesses are NOT stored —
-                # low quality; only real search finds win.
-                _save_to_user_index(_user_index_path(cfg), key, url)
-                return url, "search"
+                candidates.append((s.split()[0], ln))
+    if len(candidates) > 1 and query:
+        # Disambiguation (QA-audit finding): bare 'trio' resolved to a
+        # diabetes app. Two signals decide: (1) query-term overlap with the
+        # candidate line; (2) a software-prior — this is a PROGRAMMING-docs
+        # tool, so snippets carrying programming vocabulary (python, async,
+        # api, library...) strongly indicate the right project when query
+        # terms are absent from snippets (they usually are: engines quote
+        # lead paragraphs, not API terms).
+        q_terms = [w for w in re.findall(r"[a-z0-9]+", query.lower()) if len(w) > 2]
+        _CODE_VOCAB = ("python", "async", "await", " api", "library", "framework",
+                       "sdk", "programming", "developer", "github.com/python",
+                       "readthedocs", "pip ", "npm ")
+        def _score(pair):
+            url, ctx = pair
+            hay = (url + " " + ctx).lower()
+            s = sum(1.0 for w in q_terms if w in hay)
+            if key in urlsplit(url).netloc.lower():
+                s += 2.0  # the library owns the domain — strongest signal
+            if any(v in hay for v in _CODE_VOCAB):
+                s += 1.5  # programming context — this tool's domain
+            return s
+        candidates.sort(key=_score, reverse=True)
+    for url, _ctx in candidates:
+        # phase 3b: remember search-found docs sites in the user index, so
+        # the next call for the same library skips the network entirely.
+        # GitHub slug guesses are NOT stored — low quality; only real
+        # search finds win.
+        _save_to_user_index(_user_index_path(cfg), key, url)
+        return url, "search"
     # last resort: github slug
     if " " not in key and "/" not in key:
         return f"https://github.com/{key}", "github"
@@ -362,7 +388,7 @@ async def library_docs(engine, library: str, query: str, max_chars: int = 6000,
     project's docs domain; the raw entry page alone is already an honest
     partial answer when that search finds nothing.
     """
-    base_url, source = await resolve_docs_url(engine, library)
+    base_url, source = await resolve_docs_url(engine, library, query=query)
     version = (version or "").strip() or None
 
     # ---- phase 3a: version pinning (GitHub repos only) --------------------

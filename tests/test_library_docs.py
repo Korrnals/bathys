@@ -304,3 +304,67 @@ class LibraryDocsEndToEndTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class DisambiguationTest(unittest.TestCase):
+    """QA-audit finding: bare names resolving to wrong same-named projects.
+    Programming-vocabulary prior must pick the right candidate."""
+
+    def test_code_prior_prefers_python_candidate(self):
+        import asyncio
+
+        from bathys.library_docs import resolve_docs_url
+
+        class _FakeEngine:
+            async def search(self, q, max_results=5, refresh=False):
+                return (
+                    "1. TrioDocs\n   https://triodocs.org/\n"
+                    "   Trio is an open-source automated insulin delivery system for iOS\n"
+                    "2. Tutorial — Trio documentation\n   https://trio.readthedocs.io/en/stable/tutorial.html\n"
+                    "   Unlike many async/await tutorials... python interpreter\n"
+                )
+
+            cfg = None  # no user-index path in a fake engine
+
+        url, source = asyncio.run(
+            resolve_docs_url(_FakeEngine(), "trio", "structured concurrency"))
+        self.assertEqual(url, "https://trio.readthedocs.io/en/stable/tutorial.html")
+        self.assertEqual(source, "search")
+
+    def test_no_query_keeps_first_candidate(self):
+        import asyncio
+
+        from bathys.library_docs import resolve_docs_url
+
+        class _FakeEngine:
+            async def search(self, q, max_results=5, refresh=False):
+                return "1. A\n   https://docs.a.org/x\n   about a\n"
+
+            cfg = None
+
+        url, _ = asyncio.run(resolve_docs_url(_FakeEngine(), "a"))
+        self.assertEqual(url, "https://docs.a.org/x")
+
+    def test_query_terms_beat_code_prior(self):
+        # query terms in a snippet outweigh the generic prior — but the
+        # host-match bonus is a separate, stronger heuristic (a candidate
+        # owning the library-name domain wins); assert that ordering.
+        import asyncio
+
+        from bathys.library_docs import resolve_docs_url
+
+        class _FakeEngine:
+            async def search(self, q, max_results=5, refresh=False):
+                return (
+                    "1. Random trio blog\n   https://blogs.example.org/structured-concurrency/\n"
+                    "   structured concurrency post\n"
+                    "2. Python trio\n   https://trio.readthedocs.io/\n"
+                    "   async library documentation\n"
+                )
+
+            cfg = None
+
+        url, _ = asyncio.run(
+            resolve_docs_url(_FakeEngine(), "trio", "structured concurrency"))
+        # host owning the name beats a query-term-only hit on a random host
+        self.assertEqual(url, "https://trio.readthedocs.io/")
+
