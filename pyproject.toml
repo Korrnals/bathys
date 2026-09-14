@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "bathys"
-version = "0.9.0"
+version = "0.10.0"
 description = "Unified local deep-research search service for AI agents — one pipeline (search → extraction → query distillation → cache), zero cloud quotas. MCP stdio server with native harness integration (bathys install)."
 keywords = ["mcp", "deep-research", "search", "web-search", "ai-agents", "llm", "local-first", "distillation", "searxng", "crawl4ai"]
 classifiers = [
@@ -46,3 +46,4 @@ packages = ["src/bathys"]
 # --with-agent` works from a PyPI install, not only from a repo clone.
 [tool.hatch.build.targets.wheel.force-include]
 "agents" = "bathys/agents"
+"src/bathys/docs_index.json" = "bathys/docs_index.json"

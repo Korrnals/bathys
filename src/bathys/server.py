@@ -197,6 +197,37 @@ async def read_url(
 
 
 @mcp.tool(annotations=ToolAnnotations(
+    title="Документация библиотеки (актуальная, из первоисточника)",
+    readOnlyHint=True,
+    openWorldHint=True,
+))
+async def library_docs(
+    library: str,
+    query: str,
+    max_chars: int = 6000,
+    refresh: bool = False,
+    ctx: Context = None,
+) -> str:
+    """Fetch up-to-date official documentation for a library and distill it under your question.
+
+    Context7-style, but local and unlimited: the docs site is resolved from a
+    built-in index (or one live web search), fetched from the primary source,
+    and distilled to passages relevant to `query`. Repeated questions about
+    the same library are instant, offline and free (raw-page cache).
+    Args:
+        library: library name, e.g. "fastapi", "react", "postgresql", "crawl4ai"
+        query: your concrete question about the library (used for distillation)
+        max_chars: output character budget (300-20000)
+        refresh: re-fetch the docs page even if cached
+    """
+    from . import library_docs as _ld
+
+    eng = _engine(ctx)
+    return await _ld.library_docs(eng, library, query, max_chars=max_chars,
+                                  refresh=refresh)
+
+
+@mcp.tool(annotations=ToolAnnotations(
     title="Пакетное чтение до 10 страниц",
     readOnlyHint=True,
     openWorldHint=True,
