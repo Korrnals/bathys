@@ -1,11 +1,14 @@
 """library_docs — up-to-date library documentation for agents, Context7-style
 but local and unlimited (initiative: docs/product/library-docs-initiative.md).
 
-Resolution chain: seed index (docs_index.json) -> one live web_search
-("<library> official documentation") -> GitHub slug guess. Extraction reuses
-the two-tier crawler; distillation reuses the BM25 passage engine; the raw
-page lands in the existing page cache, so follow-up questions on the same
-library are instant, offline and free.
+Resolution chain (phase 3): seed index (docs_index.json) -> user-grown
+index (BATHYS_DOCS_INDEX, auto-filled from live-search finds) -> one live
+web_search ("<library> official documentation") -> GitHub slug guess. With
+`version` given and a GitHub repo known (owner/repo), docs resolve from
+raw.githubusercontent.com at that tag — pinned docs for the exact version
+asked. Extraction reuses the two-tier crawler; distillation reuses the
+BM25 passage engine; the raw page lands in the existing page cache, so
+follow-up questions on the same library are instant, offline and free.
 
 Phase 2 (v0.11.0): doc HOME pages are often navigational. After the home
 read, we extract same-site subpage links from the raw text, rank them against
@@ -39,6 +42,49 @@ def _seed_index() -> dict[str, str]:
         return {}
 
 
+def _user_index_path(cfg) -> Path | None:
+    """BATHYS_DOCS_INDEX location; None when the engine/config carries no
+    data_dir (unit-test fakes may have neither)."""
+    path = getattr(cfg, "docs_index", None) if cfg is not None else None
+    return path or (cfg.data_dir / "docs-index.json" if cfg is not None else None)
+
+
+def _load_user_index(path: Path | None) -> dict[str, str]:
+    if path is None:
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    return {k: v for k, v in data.items()
+            if isinstance(k, str) and isinstance(v, str) and not k.startswith("_")}
+
+
+def _save_to_user_index(path: Path | None, library: str, url: str) -> None:
+    """Idempotent write-through of a successful search resolve: same key
+    rewrites to the same value, corrupt/unwritable index never breaks the
+    tool. Lazy: the file appears only when there is something to store."""
+    if path is None:
+        return
+    data = _load_user_index(path)
+    if data.get(_normalize(library)) == url:
+        return  # idempotent: nothing to rewrite
+    data[_normalize(library)] = url
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n",
+                       encoding="utf-8")
+        tmp.replace(path)
+    except OSError:
+        try:
+            tmp.unlink(missing_ok=True)
+        except (OSError, NameError, UnboundLocalError):
+            pass
+
+
 def _normalize(name: str) -> str:
     return (name or "").strip().lower().lstrip("/").rstrip("/")
 
@@ -46,17 +92,22 @@ def _normalize(name: str) -> str:
 async def resolve_docs_url(engine, library: str) -> tuple[str, str]:
     """Return (docs_url, source) for a library name.
 
-    source: 'index' | 'search' | 'github' — provenance for the answer header.
-    Raises RuntimeError when nothing plausible is found.
+    source: 'index' | 'user-index' | 'search' | 'github' — provenance for the
+    answer header. Resolution priority: seed index -> user-grown index ->
+    one live web_search -> GitHub slug guess. Raises RuntimeError when
+    nothing plausible is found.
     """
-    idx = _seed_index()
     key = _normalize(library)
-    if key in idx:
-        return idx[key], "index"
-    # try a few common alias shapes (js suffix, -python, etc.)
-    for suffix in ("js", "-js", ".js", "-python", "py", "-dev"):
-        if key + suffix in idx:
-            return idx[key + suffix], "index"
+    seed = _seed_index()
+    hit = _index_lookup(seed, key)
+    if hit:
+        return hit, "index"
+
+    cfg = getattr(engine, "cfg", None)
+    user = _load_user_index(_user_index_path(cfg))
+    hit = _index_lookup(user, key)
+    if hit:
+        return hit, "user-index"
 
     # live search fallback: one web_search call
     raw = await engine.search(f"{library} official documentation", max_results=5, refresh=False)
@@ -65,8 +116,15 @@ async def resolve_docs_url(engine, library: str) -> tuple[str, str]:
         s = ln.strip()
         if s.startswith("http://") or s.startswith("https://"):
             low = s.lower()
-            if any(b in low for b in ("docs.", "/docs", "documentation.", "developer.")):
-                return s.split()[0], "search"
+            if any(b in low for b in ("docs.", "/docs", "documentation.", "developer.",
+                                      "github.com/")):
+                url = s.split()[0]
+                # phase 3b: remember search-found docs sites in the user
+                # index, so the next call for the same library skips the
+                # network entirely. GitHub slug guesses are NOT stored —
+                # low quality; only real search finds win.
+                _save_to_user_index(_user_index_path(cfg), key, url)
+                return url, "search"
     # last resort: github slug
     if " " not in key and "/" not in key:
         return f"https://github.com/{key}", "github"
@@ -79,6 +137,59 @@ def _same_site(base: str, cand: str) -> bool:
     except ValueError:
         return False
     return b.netloc.replace("www.", "") == c.netloc.replace("www.", "")
+
+
+def _index_lookup(idx: dict[str, str], key: str) -> str | None:
+    """Exact match, then common alias shapes (js suffix, -python, etc.)."""
+    if key in idx:
+        return idx[key]
+    for suffix in ("js", "-js", ".js", "-python", "py", "-dev"):
+        if key + suffix in idx:
+            return idx[key + suffix]
+    return None
+
+
+_GH_REPO_RE = re.compile(r"github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/?$")
+_RAW_HOST = "raw.githubusercontent.com"
+
+
+def _tag_variants(version: str) -> tuple[str, ...]:
+    """'2.1' -> ('2.1', 'v2.1'); 'v2.1' -> ('v2.1', '2.1'). Branch names and
+    SHAs pass through as-is first (they are legal raw.githubusercontent refs)."""
+    v = version.strip()
+    if not v:
+        return ()
+    if v[0] in "vV" and len(v) > 1 and v[1].isdigit():
+        return (v, v[1:])
+    if v[0].isdigit():
+        return (v, "v" + v)
+    return (v,)
+
+
+def _raw_url(owner: str, repo: str, tag: str, path: str) -> str:
+    return f"https://{_RAW_HOST}/{owner}/{repo}/{tag}/{path}"
+
+
+async def _resolve_versioned(engine, repo: tuple[str, str], version: str,
+                             max_chars: int, refresh: bool):
+    """Phase 3a: docs pinned to a GitHub tag via raw.githubusercontent.
+
+    Entry discovery is deliberately shallow: for each tag variant try
+    README.md then docs/index.md in the repo root — one candidate per shot.
+    First 200 wins; anything else (404 for a wrong tag, README missing,
+    network) gives up honestly and the caller falls back to the latest-docs
+    path with a note. No deep guessing: a wrong tag must fail fast."""
+    owner, name = repo
+    for tag in _tag_variants(version):
+        for path in ("README.md", "docs/index.md"):
+            url = _raw_url(owner, name, tag, path)
+            try:
+                res = await engine._read(url, query=None, max_chars=max_chars,
+                                         refresh=refresh)
+            except Exception:  # noqa: BLE001 — wrong tag/path: try next
+                continue
+            return res, url, tag
+    return None, None, None
 
 
 def _q_variants(token: str) -> tuple[str, ...]:
@@ -138,8 +249,6 @@ async def _search_subpages(engine, library: str, base_url: str, query: str,
                            limit: int) -> list[str]:
     """Site-scoped web search as the subpage-discovery fallback for homes
     that carry no extractable links."""
-    from urllib.parse import urlsplit
-
     host = urlsplit(base_url).netloc.replace("www.", "")
     raw = await engine.search(f"{library} {query} site:{host}", max_results=limit + 2,
                               refresh=False)
@@ -155,74 +264,168 @@ async def _search_subpages(engine, library: str, base_url: str, query: str,
     return out
 
 
-async def library_docs(engine, library: str, query: str, max_chars: int = 6000,
-                       refresh: bool = False, subpages: int = 3) -> str:
-    """Fetch and distill official docs for `library` under `query`.
+async def _fetch_subpages(engine, pages: list[str], query: str, per_page: int,
+                          refresh: bool) -> tuple[list[tuple[str, str]], list[str]]:
+    """Dive `pages` in parallel under the engine semaphore; return
+    ([(url, distilled)], failed_notes). A dead subpage costs one note,
+    never the call."""
+    texts: list[tuple[str, str]] = []
+    failed: list[str] = []
+    if not pages:
+        return texts, failed
+    sem = engine._dive_sem
 
-    Phase 2: when the home page distills thin (navigational), up to
-    `subpages` same-site pages ranked by query relevance are fetched in
-    parallel and merged into one digest.
-    """
-    url, source = await resolve_docs_url(engine, library)
-    res = await engine._read(url, query=query, max_chars=max_chars, refresh=refresh)
+    async def dive(u: str):
+        async with sem:
+            try:
+                r = await engine._read(u, query=query, max_chars=per_page,
+                                       refresh=refresh)
+                return r, u, None
+            except Exception as e:  # noqa: BLE001 — one dead subpage is fine
+                return None, u, f"{e.__class__.__name__}"
 
-    home_slim = distill.slim_markdown(res.page.text)
-    home_distilled = distill.passages(home_slim, query, max_chars)
+    outs = await asyncio.gather(*(dive(u) for u in pages))
+    for r, u, err in outs:
+        if r is None:
+            failed.append(f"{u} ({err})")
+            continue
+        slim = distill.slim_markdown(r.page.text)
+        d = distill.passages(slim, query, per_page)
+        if d:
+            texts.append((u, d))
+    return texts, failed
 
-    sub_texts: list[str] = []
-    sub_urls: list[str] = []
-    sub_failed: list[str] = []
-    raw = res.page.text or ""
-    # Subpage follow-loading is UNCONDITIONAL for library docs (this is the
-    # tool's profile): lexical navigational heuristics proved unreliable at
-    # the TOC/prose boundary, so the decision is objective — always enrich
-    # with query-relevant subpages; content-rich homes simply contribute
-    # related pages on top. One extra searx query when links are absent is
-    # a fair price for depth.
-    if subpages > 0:
-        pages = _extract_subpages(raw, url, query, limit=subpages)
-        if not pages:
-            # linkless home (nav markup stripped by the HTTP tier): discover
-            # subpages with one targeted site-search through our own engine.
-            pages = await _search_subpages(engine, library, url, query, limit=subpages)
-        if pages:
-            sem = engine._dive_sem
 
-            async def dive(u: str):
-                async with sem:
-                    try:
-                        r = await engine._read(u, query=query,
-                                                max_chars=max(max_chars // (len(pages) + 1), 300),
-                                                refresh=refresh)
-                        return r, u, None
-                    except Exception as e:  # noqa: BLE001 — one dead subpage is fine
-                        return None, u, f"{e.__class__.__name__}"
-
-            outs = await asyncio.gather(*(dive(u) for u in pages))
-            for r, u, err in outs:
-                if r is None:
-                    sub_failed.append(f"{u} ({err})")
-                    continue
-                slim = distill.slim_markdown(r.page.text)
-                d = distill.passages(slim, query, max(max_chars // (len(pages) + 1), 300))
-                if d:
-                    sub_texts.append(f"### {u}\n\n{d}")
-                    sub_urls.append(u)
-
+def _assemble_digest(library: str, base_url: str, source: str, res, *,
+                     home_distilled: str, sub_texts: list[str], sub_urls: list[str],
+                     sub_failed: list[str], version_note: str) -> str:
+    """One answer shape for every resolution path (versioned raw, doc site):
+    header with provenance, home digest, subpage sections, honest notes,
+    stats footer — footer stays the last line (output-format contract)."""
     from .core import _ch
 
-    total_out = len(home_distilled) + sum(len(s) for s in sub_texts)
-    head = f"# Документация: {library}\n{url}\n(источник: {source})"
+    total_out = len(home_distilled) + sum(len(t) for _, t in sub_texts)
+    head = f"# Документация: {library}\n{base_url}\n(источник: {source})"
     parts = [head]
     if home_distilled:
         parts.append(home_distilled)
-    parts += sub_texts
+    parts += [f"### {u}\n\n{t}" for u, t in sub_texts]
     tail = ""
     if sub_urls or sub_failed:
         tail = "\n\nПодстраницы: " + ", ".join(sub_urls)
         if sub_failed:
             tail += " | не прочитаны: " + ", ".join(sub_failed)
+    if version_note:
+        tail += f"\n\n{version_note}"
     footer = (f"[bathys: docs {_ch(res.page.raw_chars)} ch → {_ch(total_out)} ch"
               f"{' · +' + str(len(sub_urls)) + ' подстр.' if sub_urls else ''} · "
               f"cache {'HIT' if res.cache_hit else 'MISS'}] — повторы бесплатны: уточняй запросом")
     return "\n\n".join(p for p in parts if p) + tail + "\n\n" + footer
+
+
+def _gh_repo_from(base_url: str, library: str) -> tuple[str, str] | None:
+    """(owner, repo) when the docs resolve maps to a GitHub repo — the only
+    shape phase-3a version pinning applies to. No guessing beyond what the
+    resolver already established: github.com/{owner}/{repo} URLs, or a
+    {owner}/{repo} given AS the library name itself."""
+    m = _GH_REPO_RE.search(base_url or "")
+    if m:
+        return m.group(1), m.group(2)
+    key = _normalize(library)
+    if "/" in key and " " not in key:
+        owner, _, repo = key.partition("/")
+        if owner and repo:
+            return owner, repo
+    return None
+
+
+async def library_docs(engine, library: str, query: str, max_chars: int = 6000,
+                       refresh: bool = False, subpages: int = 3,
+                       version: str | None = None) -> str:
+    """Fetch and distill official docs for `library` under `query`.
+
+    Phase 2: the docs home is usually navigational, so up to `subpages`
+    same-site pages ranked by query relevance are fetched in parallel and
+    merged into one digest. Subpage follow-loading is UNCONDITIONAL (the
+    tool's profile): lexical navigational heuristics proved unreliable at
+    the TOC/prose boundary; one extra search when a home has no
+    extractable links is a fair price for depth.
+
+    Phase 3a: with `version` given and a GitHub repo behind the resolve,
+    the docs come from raw.githubusercontent.com/{owner}/{repo}/{tag}/
+    (entry found shallowly: README.md, then docs/index.md — one candidate
+    per shot; a wrong tag fails fast and the latest docs are shown with an
+    honest note). Doc sites are NOT version-pinned (not every docs site
+    versions by URL) — there `version` only sharpens the site-search
+    ranking for subpages. Versioned raw pages carry no same-site links,
+    so their subpages come from one site-scoped live search over the
+    project's docs domain; the raw entry page alone is already an honest
+    partial answer when that search finds nothing.
+    """
+    base_url, source = await resolve_docs_url(engine, library)
+    version = (version or "").strip() or None
+
+    # ---- phase 3a: version pinning (GitHub repos only) --------------------
+    if version:
+        repo = _gh_repo_from(base_url, library)
+        if repo:
+            vres, v_url, tag = await _resolve_versioned(
+                engine, repo, version, max_chars, refresh)
+            if vres is not None:
+                raw_text = vres.page.text or ""
+                home_slim = distill.slim_markdown(raw_text)
+                home_distilled = distill.passages(home_slim, query, max_chars)
+                sub_texts: list[tuple[str, str]] = []
+                sub_urls: list[str] = []
+                sub_failed: list[str] = []
+                # raw pages are linkless markdown: discover query-relevant
+                # pages with one site-scoped search over the project docs
+                # domain, not raw.githubusercontent.com.
+                host = (repo[1] if "." in repo[1] else repo[1] + ".github.io")
+                if subpages > 0:
+                    found = await _search_subpages(engine, repo[1],
+                                                   f"https://{host}/", query,
+                                                   limit=subpages)
+                    per = max(max_chars // (len(found) + 1), 300) if found else 0
+                    sub_texts, sub_failed = await _fetch_subpages(
+                        engine, found, query, per, refresh)
+                    sub_urls = [u for u, _ in sub_texts]
+                return _assemble_digest(
+                    library, v_url, f"{source}+raw@{tag}", vres,
+                    home_distilled=home_distilled, sub_texts=sub_texts,
+                    sub_urls=sub_urls, sub_failed=sub_failed, version_note="")
+            note = (f"Версия {version}: источник на GitHub не найден, "
+                    f"показана последняя документация")
+        else:
+            note = (f"Версия {version}: пиннинг версий поддержан только для "
+                    f"GitHub-репозиториев, показана последняя документация")
+    else:
+        note = ""
+
+    # ---- latest-docs path (seed / user-index / search / plain github) -----
+    res = await engine._read(base_url, query=query, max_chars=max_chars, refresh=refresh)
+    home_slim = distill.slim_markdown(res.page.text)
+    home_distilled = distill.passages(home_slim, query, max_chars)
+
+    sub_texts, sub_urls, sub_failed = [], [], []
+    if subpages > 0:
+        raw = res.page.text or ""
+        pages = _extract_subpages(raw, base_url, query, limit=subpages)
+        if not pages:
+            # linkless home: one targeted site-search. With `version` given
+            # on a doc-site path (no repo behind it) the version rides along
+            # in the query — better ranking on sites that keep old versions
+            # indexable.
+            if version:
+                pages = await _search_subpages(engine, library, base_url,
+                                               f"{query} {version}", limit=subpages)
+            else:
+                pages = await _search_subpages(engine, library, base_url, query, limit=subpages)
+        per = max(max_chars // (len(pages) + 1), 300)
+        sub_texts, sub_failed = await _fetch_subpages(engine, pages, query, per, refresh)
+        sub_urls = [u for u, _ in sub_texts]
+
+    return _assemble_digest(
+        library, base_url, source, res,
+        home_distilled=home_distilled, sub_texts=sub_texts,
+        sub_urls=sub_urls, sub_failed=sub_failed, version_note=note)

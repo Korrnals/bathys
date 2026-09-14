@@ -18,7 +18,7 @@ docs/
 ├── index.md                        # вы здесь: хаб и маршруты
 ├── getting-started/
 │   ├── install.md                  # установка: однострочник, pip, npm, исходники; снятие
-│   ├── configure.md                # 20 env-переменных, настройки SearXNG, START_MODE
+│   ├── configure.md                # 22 env-переменные, настройки SearXNG, START_MODE
 │   ├── integrate.md                # базовый конфиг mcpServers, playbook агента
 │   └── cases.md                    # живые кейсы: запрос → инструменты → профит; обучение харнесса
 ├── integrations/
@@ -45,7 +45,7 @@ docs/
 │   ├── mcp-tools.md                # сигнатуры четырёх инструментов и параметры
 │   ├── output-format.md            # контракт футеров и форматов ответов
 │   ├── module-contracts.md         # внутренние инварианты модулей src/bathys
-│   └── config.md                   # полная таблица 20 env-переменных
+│   └── config.md                   # полная таблица 22 env-переменных
 ├── adr/                            # принятые решения, нумерация NNNN-slug
 │   ├── 0001-python-crawl4ai.md     # Python + Crawl4AI как ядро извлечения
 │   ├── 0002-pin-mcp-sdk-v1.md      # пин mcp SDK на v1

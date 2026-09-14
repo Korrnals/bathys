@@ -12,6 +12,7 @@
 | `web_search`, MISS | `[bathys: {hits} hits · {secs}s · searx json {in} ch → {out} ch]` |
 | `read_url` | `[bathys: page {in} ch → {out} ch · {query-distilled\|head-trimmed\|robots-refused} · cache {HIT\|MISS} · {secs}s]` |
 | `read_urls` | `[bathys: batch {n} urls · {ok}/{n} ok · {in} ch fetched → {out} ch returned · {secs}s]` |
+| `library_docs` | `[bathys: docs {in} ch → {out} ch · +{n} подстр. · cache {HIT\|MISS}]` |
 | `deep_research` | `[bathys: {raw_hits} raw hits, top {n} considered · dove {k} pages · {in} ch fetched → {out} ch returned · {secs}s]` |
 
 Режим `robots-refused` (v0.4): страница не читалась — robots.txt хоста запрещает путь для краулеров; тело при этом `# {url}\n{url}\n\n(not fetched — robots.txt disallows this path: {url})`, поля объёма нулевые, вызов не является ошибкой. Режим `as_json=true` у `web_search` (v0.3): ответ — чистый JSON-объект `{query, count, hits[], answer?}` одной строкой, **без футера** (футер сломал бы строгие json.loads-парсеры; телеметрия такого вызова уходит в `metrics.jsonl`).

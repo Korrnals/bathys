@@ -21,6 +21,13 @@ async def main() -> None:
 
             tools = await session.list_tools()
             print("tools:", [t.name for t in tools.tools])
+            expected_tools = {
+                "deep_research", "web_search", "read_url", "read_urls",
+                "library_docs", "source_check",
+            }
+            assert {t.name for t in tools.tools} == expected_tools, (
+                f"expected exactly the six Bathys tools, got {sorted(t.name for t in tools.tools)}"
+            )
             for t in tools.tools:
                 a = t.annotations
                 print(
@@ -67,6 +74,13 @@ async def main() -> None:
             )
             print("\n--- deep_research (first 2500 chars) ---")
             print(res2.content[0].text[:2500])
+
+            res3 = await session.call_tool(
+                "source_check",
+                {"claim": "crawl4ai renders JS-heavy pages headlessly", "max_sources": 2},
+            )
+            print("\n--- source_check (first 2000 chars) ---")
+            print(res3.content[0].text[:2000])
 
 
 if __name__ == "__main__":

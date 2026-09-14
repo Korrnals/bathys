@@ -28,7 +28,7 @@ flowchart LR
 |---|---|
 | `server.py` | объявляет три MCP-инструмента, держит `Engine` в lifespan, уводит чужие логи с stdout |
 | `core.py` | ведёт конвейер: `research` / `search` / `read`, кэш-ключи, клампинг аргументов, футеры |
-| `config.py` | читает 12 env-переменных с дефолтами в frozen-датакласс `Config` |
+| `config.py` | читает 21 env-переменную с дефолтами в frozen-датакласс `Config` (22-я, `BATHYS_DOCS_INDEX`, — через свойство `docs_index` при обращении) |
 | `services.py` | обеспечивает живой SearXNG: пинг, автостарт external → docker → native, класс `_Native` |
 | `searx.py` | клиент SearXNG: `clean_text`, `normalize_url` (срез utm), дедупликация, ранжирование по score |
 | `crawler.py` | держит общий headless-chromium, выполняет нырёк: рендер, вырезание мусора, `fit_markdown` |

@@ -8,6 +8,7 @@
 - **Чтение один раз на процесс:** `Config.load()` вызывается в lifespan при старте сервера; изменение env требует рестарта процесса. Инфраструктура (docker/native) читает те же значения из этого снимка.
 - Булево `BATHYS_AUTO_START`: false только для `""`, `0`, `false`, `no`, `off` (без учёта регистра, с обрезкой пробелов); всё остальное — true.
 - Пути проходят `expanduser()`; `BATHYS_SEARXNG_HOME` по умолчанию вычисляется от итогового `BATHYS_DATA_DIR`.
+- Исключение — `BATHYS_DOCS_INDEX` (v0.12): читается не в `Config.load()`, а в свойстве `Config.docs_index` при каждом обращении — чтобы `dataclasses.replace(cfg, data_dir=…)` (паттерн тестов и скриптов) не оставлял путь индекса указывать на старый каталог. Побочный эффект: переменная применяется без рестарта процесса.
 - Неизвестный `BATHYS_START_MODE` не валидируется: режим, отличный от `auto|docker|native`, не предпринимает попыток автостарта — вызовы завершатся `RuntimeError` при молчащем external-инстансе.
 
 ## Таблица переменных
@@ -33,6 +34,7 @@
 | `BATHYS_BROWSER` | `auto` | режим | двухъярусное извлечение: `auto` — HTTP-движок первым, браузер только для JS-страниц; `off` — без браузера; `always` — только браузер (отладка) |
 | `BATHYS_ROBOTS` | `1` | bool | уважать robots.txt при прямых нырках страниц (F-303); fail-open при недоступном robots; поиск не затрагивается |
 | `BATHYS_METRICS` | `1` | bool | локальный журнал вызовов `{DATA_DIR}/metrics.jsonl` (F-304); выключается полностью |
+| `BATHYS_DOCS_INDEX` | `{DATA_DIR}/docs-index.json` | path | пользовательский индекс `library_docs` (фаза 3): `{library: url}`-находки живого поиска, идемпотентная дозапись; приоритет резолва seed → user-index → search; единственная переменная, читаемая в свойстве `Config.docs_index` при обращении, а не в `Config.load()` |
 | `BATHYS_ENGINE_BRAVE_KEY` | — | str | API-ключ Brave Search: одним ключом включает движок `braveapi` (официальный API-модуль) в генерируемых настройках SearXNG нативного режима (F-203, `services.render_settings`); для docker-режима — пропишите движок в settings сами |
 | `BATHYS_ENGINES` | — | str | набор безключевых движков (через запятую) для активации в нативном режиме; live-аудит 2026-09-09: `mwmbl,mojeek,brave` (ноль капч), `duckduckgo/qwant/startpage` на момент аудита — CAPTCHA |
 

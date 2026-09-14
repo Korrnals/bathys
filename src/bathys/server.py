@@ -3,11 +3,13 @@
 Owns the whole pipeline (search -> extraction -> query distillation -> cache);
 SearXNG and Crawl4AI are swappable internal engines, not the product.
 
-Five tools, deliberately small surface:
+Six tools, deliberately small surface:
   deep_research(query) — search + read top sources + query-distilled digest;
   web_search(query)    — ranked links only;
   read_url(url, query) — distilled text of one page;
   read_urls(urls, …)   — batch read of known URLs under one shared budget;
+  source_check(claim, urls?) — deterministic claim verification against
+  sources (no LLM): verdict + quoted passages;
   library_docs(library, query) — up-to-date library docs distilled under
   the question (Context7-style, but local and unlimited).
 
@@ -27,6 +29,7 @@ from mcp.types import ToolAnnotations
 from . import batch
 from .config import Config
 from .core import Engine
+from . import source_check as _sc
 
 
 @contextlib.asynccontextmanager
@@ -57,7 +60,11 @@ mcp = FastMCP(
         "web_search(…, as_json=true);\n"
         "- один известный URL → read_url(url, query=…);\n"
         "- несколько известных URL (до 10) → read_urls(urls, query=…): один "
-        "вызов, общий бюджет, битая страница стоит строку.\n\n"
+        "вызов, общий бюджет, битая страница стоит строку;\n"
+        "- проверить утверждение/факт/слух (да/нет/оспорено) → "
+        "source_check(claim, urls=…): детерминированный вердикт SUPPORTED/"
+        "CONTRADICTED/UNCLEAR/MISSING-EVIDENCE с цитатами; без urls ищет "
+        "источники сам.\n\n"
         "Правила:\n"
         "- запрос — вопрос, а не мешок ключевых слов: дистиллятор отбирает "
         "пассажи по смыслу запроса;\n"
@@ -214,6 +221,7 @@ async def library_docs(
     max_chars: int = 6000,
     refresh: bool = False,
     subpages: int = 3,
+    version: str | None = None,
     ctx: Context = None,
 ) -> str:
     """Fetch up-to-date official documentation for a library and distill it under your question.
@@ -229,12 +237,18 @@ async def library_docs(
         refresh: re-fetch the docs page even if cached
         subpages: when the docs home is navigational, follow this many
             same-site subpages ranked by query relevance (0 disables)
+        version: pin docs to this version (tag, e.g. "0.115.0", "v3", branch
+            name). Works for GitHub-backed libraries: docs come from that
+            exact tag on raw.githubusercontent.com. Doc sites are shown at
+            their latest with an honest note; wrong/missing tag on GitHub
+            also falls back to latest with a note in the answer
     """
     from . import library_docs as _ld
 
     eng = _engine(ctx)
     return await _ld.library_docs(eng, library, query, max_chars=max_chars,
-                                  refresh=refresh, subpages=subpages)
+                                  refresh=refresh, subpages=subpages,
+                                  version=version)
 
 
 @mcp.tool(annotations=ToolAnnotations(
@@ -265,6 +279,37 @@ async def read_urls(
     """
     return await batch.read_many(
         _engine(ctx), urls, query=query, total_chars=total_chars, refresh=refresh,
+    )
+
+
+@mcp.tool(annotations=ToolAnnotations(
+    title="Проверка утверждения по источникам (детерминированная)",
+    readOnlyHint=True,
+    openWorldHint=True,
+))
+async def source_check(
+    claim: str,
+    urls: list[str] | None = None,
+    max_sources: int = 4,
+    refresh: bool = False,
+    ctx: Context = None,
+) -> str:
+    """Deterministically verify a claim against web sources; return a verdict with quoted passages.
+
+    No LLM involved: sources are read (yours via `urls`, or found by a web
+    search on the claim), distilled under the claim, and scored lexically —
+    polar markers (with negation handling) decide SUPPORTED / CONTRADICTED /
+    UNCLEAR / MISSING-EVIDENCE. Best for checking a fact, assertion or rumour
+    when you need a reproducible verdict with citations, not a narrative.
+    Args:
+        claim: the statement to verify, in your own words (RU/EN both fine)
+        urls: optional 1-10 http(s) URLs to check against; without them the
+            sources are found by a web search on the claim
+        max_sources: how many sources to consider (1-10)
+        refresh: ignore cache and re-fetch the search results and pages
+    """
+    return await _sc.source_check(
+        _engine(ctx), claim, urls=urls, max_sources=max_sources, refresh=refresh,
     )
 
 

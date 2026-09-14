@@ -43,6 +43,17 @@ class Config:
     respect_robots: bool
     metrics: bool
 
+    # Computed, not env-loaded: the user-grown docs index (library_docs phase
+    # 3) lives under data_dir unless BATHYS_DOCS_INDEX points elsewhere. A
+    # property keeps the dataclass field surface frozen for every
+    # dataclasses.replace() consumer (tests build configs that way).
+    @property
+    def docs_index(self) -> Path:
+        v = os.environ.get("BATHYS_DOCS_INDEX")
+        if v:
+            return Path(v).expanduser()
+        return self.data_dir / "docs-index.json"
+
     @classmethod
     def load(cls) -> "Config":
         data_dir = Path(

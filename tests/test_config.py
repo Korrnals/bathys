@@ -81,5 +81,35 @@ class SearxngUrlTest(unittest.TestCase):
             self.assertEqual(Config.load().searxng_url, "http://x.test:8888")
 
 
+class DocsIndexTest(unittest.TestCase):
+    """Phase 3 library_docs: user-grown index location, env-overridable.
+
+    docs_index is a property resolved at access time (not a load-time
+    snapshot) so that dataclasses.replace(cfg, data_dir=…) — the tests'
+    tmp-dir pattern — keeps pointing at the right place; BATHYS_DOCS_INDEX
+    therefore must be asserted INSIDE the patched-env block."""
+
+    def test_default_under_data_dir(self):
+        env = base_env(BATHYS_DATA_DIR="/tmp/bathys-data-test")
+        with mock.patch.dict(os.environ, env, clear=True):
+            cfg = Config.load()
+            self.assertEqual(str(cfg.docs_index), "/tmp/bathys-data-test/docs-index.json")
+
+    def test_env_overrides_path(self):
+        env = base_env(BATHYS_DOCS_INDEX="/tmp/my-docs-index.json")
+        with mock.patch.dict(os.environ, env, clear=True):
+            cfg = Config.load()
+            self.assertEqual(str(cfg.docs_index), "/tmp/my-docs-index.json")
+
+    def test_survives_dataclasses_replace(self):
+        env = base_env()
+        with mock.patch.dict(os.environ, env, clear=True):
+            cfg = Config.load()
+        import dataclasses
+
+        cfg2 = dataclasses.replace(cfg, data_dir=cfg.data_dir / "alt")
+        self.assertEqual(cfg2.docs_index, cfg.data_dir / "alt" / "docs-index.json")
+
+
 if __name__ == "__main__":
     unittest.main()
