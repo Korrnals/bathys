@@ -38,6 +38,10 @@ _SUPPORT_MARKERS = (
     "yes", "true", "correct", "confirmed", "according to", "shows that",
     "demonstrates", "reported", "verified", "established",
     "подтверждает", "верно", "согласно",
+    # definitional copulas (QA-audit finding: "X is a Y" — the most common
+    # shape of a direct factual confirmation — scored no marker at all)
+    " is a ", " is an ", " is the ", " are a ", " are the ", " was a ",
+    " was the ", " были ", " является ", " являются ",
 )
 _CONTRA_MARKERS = (
     "not true", "false", "incorrect", "debunked", "retracted", "no longer",

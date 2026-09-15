@@ -284,3 +284,59 @@ class P95Test(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class JunkGateTest(unittest.TestCase):
+    """QA-audit: gibberish queries must give an honest No-results, not
+    username-echo noise. v4: a hit survives when it covers >=50% of the
+    query's meaningful terms in title+snippet (URL excluded)."""
+
+    def _engine(self):
+        from bathys.config import Config
+        eng = Engine(Config.load())
+        return eng
+
+    def test_gibberish_query_filters_echo_hits(self):
+        import asyncio
+
+        eng = self._engine()
+        stored = {
+            "hits": [
+                {"title": "Qwjk Qwjk", "url": "https://x.com/qwjk",
+                 "snippet": "Qwjk Qwjk is on Facebook", "engines": [], "score": 1, "published": ""},
+                {"title": "Profile / X", "url": "https://x.com/other",
+                 "snippet": "JavaScript is not available", "engines": [], "score": 1, "published": ""},
+            ],
+            "answers": [], "suggestions": [], "seconds": 0.1, "raw_chars": 100,
+            "retries": 0, "unresponsive": [],
+        }
+
+        async def fake_search_outcome(self=None, **kw):
+            return stored, False
+
+        eng._search_outcome = fake_search_outcome
+        out = asyncio.run(eng.search("zzqqxxwvyu nonterm qwjk", max_results=5))
+        self.assertIn("No results", out)
+
+    def test_normal_query_keeps_partial_coverage(self):
+        import asyncio
+
+        eng = self._engine()
+        stored = {
+            "hits": [
+                {"title": "Python asyncio tutorial",
+                 "url": "https://docs.example/python",
+                 "snippet": "asyncio is a python library for async",
+                 "engines": [], "score": 1, "published": ""},
+            ],
+            "answers": [], "suggestions": [], "seconds": 0.1, "raw_chars": 100,
+            "retries": 0, "unresponsive": [],
+        }
+
+        async def fake(self=None, **kw):
+            return stored, False
+
+        eng._search_outcome = fake
+        out = asyncio.run(eng.search("python asyncio tutorial", max_results=5))
+        self.assertNotIn("No results", out)
+        self.assertIn("Python asyncio tutorial", out)
+

@@ -260,6 +260,28 @@ class Engine:
             raise
         secs = round(time.monotonic() - started, 1)
         hits = stored["hits"][: max(1, min(20, max_results))]
+        # Junk-gate (QA-audit finding): engines answer gibberish queries with
+        # fuzzy noise ("Profile / X" for "qwjk") that pollutes context and
+        # masks the honest No-results path. A hit is junk when NONE of the
+        # query's meaningful terms appear in its TITLE or SNIPPET — the URL is
+        # deliberately excluded: username echoes (x.com/qwjk, facebook.com/
+        # qwjk.qwjk) live there and are the main false-positive source.
+        # If junk filters everything out, the empty-body path takes over
+        # (and F-101 retries get a chance).
+        q_terms = [w for w in re.findall(r"[a-zа-яё0-9]+", query.lower()) if len(w) > 2]
+        if q_terms:
+            # Junk-gate v4 (QA-audit finding): a valid hit must cover a
+            # meaningful SHARE of the query's terms in title+snippet (URL
+            # excluded — username echoes live there). Gibberish queries
+            # ("zzqqxxwvyu nonterm qwjk") get username-echo pages covering
+            # 1-of-3 terms -> junk; real pages cover the core naturally.
+            need = max(1, (len(q_terms) + 1) // 2)  # >=50% of terms
+            def _is_junk(h: dict) -> bool:
+                hay = (str(h.get("title", "")) + " "
+                       + str(h.get("snippet", ""))).lower()
+                covered = sum(1 for w in q_terms if w in hay)
+                return covered < need
+            hits = [h for h in hits if not _is_junk(h)]
         lines: list[str] = []
         if stored["answers"]:
             lines.append("Answer: " + stored["answers"][0])
