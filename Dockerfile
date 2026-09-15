@@ -1,13 +1,16 @@
 # All-in-one image: bathys MCP server + native SearXNG + headless chromium.
 #
-# STATUS (2026-09-15): still NOT verified in a container runtime. docker is
-# absent on the dev box; podman 4.9.3 is present but cannot start — the
-# distrobox /etc/subuid declares abyss:100000:65536 while the HOST range is
-# abyss:524288:65536, so newuidmap fails with "write to uid_map failed:
-# Operation not permitted". Fix (needs root on the host or inside the box):
-#   sed -i 's/^abyss:100000:65536$/abyss:524288:65536/' /etc/subuid
-# then `podman system migrate` and build:
-#   podman build -t bathys . && podman run --rm -i bathys < scripts/stdio_smoke.json
+# STATUS (2026-09-16): not yet built in a container runtime. Local box: no
+# docker; podman cannot run in distrobox (no real subuid delegation, cgroup
+# scope hidden). Cluster release conveyor (release-pipeline) is the canonical
+# build path: its docker build phase (step 6.5) requires a docker CLI inside
+# the runner image (Dockerfile.pipeline) — the runner does not ship one yet
+# (bathys was the first project to exercise that phase; SKIP_DOCKER=1 is set
+# in the pipeline values until the runner image gains docker/buildx).
+# The image will be built and pushed to ghcr.io/korrnals/bathys once the
+# runner is updated — no Dockerfile changes expected. Native mode inside the
+# container git-clones SearXNG on first call (git/curl present below) and
+# pins the reviewed commit from config.SEARXNG_REF.
 
 FROM python:3.12-slim
 
