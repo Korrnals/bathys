@@ -2,56 +2,58 @@
 
 # Bathys
 
-**Единый локальный поисковый сервис глубокого ресёрча для ИИ-агентов.** Это самостоятельный продукт, а не обёртка над чужими сервисами: Bathys реализует весь конвейер сам — метапоиск с дедупликацией и живучестью к блокировкам, двухъярусное извлечение (HTTP-движок по умолчанию, headless-браузер только для JS-страниц), пятистадийную дистилляцию под запрос с жёсткими бюджетами, TTL-кэш сырца, robots-этику, метрики и диагностику. Метапоиск и извлечение оформлены как сменные внутренние движки (SearXNG, Crawl4AI) — их можно заменить, продукт останется Bathys. Облачных квот нет; LLM внутри нет — синтез остаётся за вызывающим агентом, дистилляция детерминированная (BM25).
+**A single local deep-research search service for AI agents.** This is a standalone product, not a wrapper over someone else's services: Bathys implements the entire pipeline itself — metasearch with deduplication and resilience to blocking, two-tier extraction (an HTTP engine by default, a headless browser only for JS pages), five-stage query-tailored distillation with hard budgets, a TTL source cache, robots ethics, metrics and diagnostics. Metasearch and extraction are packaged as swappable internal engines (SearXNG, Crawl4AI) — they can be replaced, and the product remains Bathys. No cloud quotas; no LLM inside — synthesis stays with the calling agent, and distillation is deterministic (BM25).
 
-Сонар находит координаты, батискаф ныряет за полными текстами, дистиллятор поднимает на палубу только то, что отвечает на вопрос.
+The sonar finds the coordinates, the bathyscaphe dives for the full texts, and the distiller hoists on deck only what answers the question.
 
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
-![version](https://img.shields.io/badge/version-0.14.0-9cf)
+![version](https://img.shields.io/badge/version-0.14.1-9cf)
 ![mcp](https://img.shields.io/badge/MCP-stdio%20server-6f42c1)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
-**Навигация:** [⚡ Quick start](#-quick-start) · [🧹 Удаление](#-удаление) · [🔌 Подключение](#-подключение-к-харнессу) · [🧠 Научить агента](#-научить-агента-работать-эффективно) · [🧭 Кейсы](#-ходовые-кейсы) · [🛠 Инструменты](#-инструменты) · [📊 Экономия токенов](#-экономия-токенов) · [📚 Документация](#-документация) · [📍 Статус](#-статус)
+[English](README.md) | [Russian](README.ru.md)
+
+**Navigation:** [⚡ Quick start](#-quick-start) · [🧹 Removal](#-removal) · [🔌 Harness integration](#-harness-integration) · [🧠 Teach your agent](#-teach-your-agent-to-work-effectively) · [🧭 Use cases](#-common-use-cases) · [🛠 Tools](#-tools) · [📊 Token savings](#-token-savings) · [📚 Documentation](#-documentation) · [📍 Status](#-status)
 
 ## ⚡ Quick start
 
-**Вариант 1 — установочный скрипт** (рекомендуется; Python ≥ 3.10):
+**Option 1 — install script** (recommended; Python ≥ 3.10):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Korrnals/bathys/main/install.sh | bash
 ```
 
-Скрипт ставит пакет с PyPI в приватный venv (`~/.local/share/bathys/venv`, без sudo), добавляет его в `PATH` и запускает полную настройку. Повторный запуск — безопасное обновление.
+The script installs the package from PyPI into a private venv (`~/.local/share/bathys/venv`, no sudo), adds it to `PATH` and runs the full setup. Re-running it is a safe update.
 
-**Вариант 2 — pip** (то же самое вручную):
+**Option 2 — pip** (the same thing, done manually):
 
 ```bash
 pip install bathys
 bathys setup
 ```
 
-Что делает `bathys setup`:
+What `bathys setup` does:
 
-| Шаг | Действие |
+| Step | Action |
 |---|---|
-| 1 | ставит headless-браузер — нужен только для JS-страниц (обычные страницы читает встроенный HTTP-движок) |
-| 2 | прописывает MCP-сервер во все найденные харнессы (zcode, Claude, Cursor, VS Code-семейство и другие — всего 14, см. [Подключение](#-подключение-к-харнессу)) |
-| 3 | копирует субагента-ресёрчера в каталоги найденных харнессов |
-| 4 | печатает итог и подсказки (`bathys doctor` — самодиагностика) |
+| 1 | installs the headless browser — needed only for JS pages (regular pages are read by the built-in HTTP engine) |
+| 2 | registers the MCP server in every harness it finds (zcode, Claude, Cursor, the VS Code family and others — 14 in total, see [Harness integration](#-harness-integration)) |
+| 3 | copies the researcher subagent into the found harness directories |
+| 4 | prints the summary and hints (`bathys doctor` — self-diagnostics) |
 
-SearXNG устанавливать отдельно не нужно — бэкенд поднимается автоматически при первом поиске: сначала проверяется внешний инстанс, затем docker/podman, затем нативный режим (клон в `BATHYS_SEARXNG_HOME`).
+SearXNG does not need to be installed separately — the backend starts automatically on the first search: an external instance is checked first, then docker/podman, then native mode (a clone in `BATHYS_SEARXNG_HOME`).
 
 <details>
-<summary><b>Альтернативные пути</b> — npm, исходники, откат версии</summary>
+<summary><b>Alternative routes</b> — npm, sources, version pinning</summary>
 
-**npm** (Node-first окружения; обёртка ставит Python-пакет сама):
+**npm** (Node-first environments; the wrapper installs the Python package itself):
 
 ```bash
 npm install -g bathys-mcp
 bathys-mcp setup
 ```
 
-**Из исходников** (разработка):
+**From sources** (development):
 
 ```bash
 git clone https://github.com/Korrnals/bathys.git && cd bathys
@@ -59,45 +61,45 @@ python3.12 -m venv .venv && .venv/bin/pip install -e .
 .venv/bin/bathys setup
 ```
 
-**Откат на конкретную версию** — переменная установочного скрипта:
+**Pinning a specific version** — an install-script variable:
 
 ```bash
 BATHYS_INSTALL_VERSION=0.7.0 bash install.sh
 ```
 
-Минимальный образ без `ensurepip`: скрипт и `setup` сами бутстрапят pip через `get-pip.py` — подробности в [docs/getting-started/install.md](docs/getting-started/install.md).
+A minimal image without `ensurepip`: the script and `setup` bootstrap pip themselves via `get-pip.py` — details in [docs/getting-started/install.md](docs/getting-started/install.md).
 
 </details>
 
-### 🧹 Удаление
+### 🧹 Removal
 
 ```bash
-bathys uninstall               # снять Bathys со всех харнессов
-bathys uninstall hermes zcode   # точечно, только указанные
-bathys uninstall --purge        # + удалить venv, кэш и данные
+bathys uninstall               # detach Bathys from all harnesses
+bathys uninstall hermes zcode   # pointwise, only the named ones
+bathys uninstall --purge        # + delete the venv, cache and data
 ```
 
-`uninstall` удаляет **только записи `bathys`** из конфигов харнессов (перед изменением создаётся бэкап `*.bathys-backup-*`; чужие серверы и субагенты не затрагиваются). `--purge` дополнительно удаляет каталоги `~/.local/share/bathys` и `~/.cache/bathys`; строку `bathys/venv/bin` из `.profile`/`.bashrc` удалите вручную. Подробности и восстановление из бэкапа — в [runbook](docs/operations/runbook.md).
+`uninstall` removes **only the `bathys` entries** from harness configs (a `*.bathys-backup-*` backup is created before any change; foreign servers and subagents are not touched). `--purge` additionally deletes the `~/.local/share/bathys` and `~/.cache/bathys` directories; remove the `bathys/venv/bin` line from `.profile`/`.bashrc` manually. Details and backup restore — in the [runbook](docs/operations/runbook.md).
 
-## 🔌 Подключение к харнессу
+## 🔌 Harness integration
 
-**Автоматически — весь стек:** `bathys setup` (см. выше) прописывает сервер во все найденные харнессы.
+**Automatically — the whole stack:** `bathys setup` (see above) registers the server in every harness it finds.
 
-**Точечно — когда нужно именно здесь:**
+**Pointwise — when you need it exactly here:**
 
 ```bash
-bathys install                # автодетект всех установленных харнессов
-bathys install hermes         # только Hermes (отсутствующий конфиг создастся)
-bathys install --list         # все поддерживаемые таргеты с путями
-bathys install --print-config # готовые блоки для ручной вставки
+bathys install                # auto-detect all installed harnesses
+bathys install hermes         # Hermes only (a missing config will be created)
+bathys install --list         # all supported targets with paths
+bathys install --print-config # ready-made blocks for manual pasting
 ```
 
-Детектируются zcode, Claude Code, Claude Desktop, Cursor, VS Code-семейство (Cline / Roo Code / Kilo Code), Gemini CLI, Windsurf, Zed, opencode, goose, Hermes; форматы каждого — свои (JSON-схемы и YAML-контуры goose/hermes), запись идемпотентна с бэкапом. Для Pi (badlogic pi-mono), у которого нет MCP-конфига, — дроп-ин в `AGENTS.md`. Кастомные интеграции — в каталоге [integrations/](integrations/).
+Detected: zcode, Claude Code, Claude Desktop, Cursor, the VS Code family (Cline / Roo Code / Kilo Code), Gemini CLI, Windsurf, Zed, opencode, goose, Hermes; each has its own format (JSON schemas and YAML outlines for goose/hermes), and writes are idempotent with a backup. For Pi (badlogic pi-mono), which has no MCP config, there is a drop-in into `AGENTS.md`. Custom integrations live in the [integrations/](integrations/) directory.
 
 <details>
-<summary><b>Ручное подключение</b> (когда правите конфиги сами)</summary>
+<summary><b>Manual wiring</b> (when you edit the configs yourself)</summary>
 
-Bathys — stdio MCP-сервер: блок `mcpServers` один и тот же везде, от харнесса зависит только файл, в который его кладут. `command` — абсолютный путь к бинарнику (`~` внутри JSON не раскрывается); `BATHYS_SEARXNG_HOME` опциональна. Готовые блоки под каждый клиент: `bathys install --print-config`.
+Bathys is a stdio MCP server: the `mcpServers` block is the same everywhere, and only the file it goes into depends on the harness. `command` is an absolute path to the binary (`~` is not expanded inside JSON); `BATHYS_SEARXNG_HOME` is optional. Ready-made blocks for every client: `bathys install --print-config`.
 
 ```json
 {
@@ -110,95 +112,96 @@ Bathys — stdio MCP-сервер: блок `mcpServers` один и тот же
 }
 ```
 
-| Харнесс | Гайд |
+| Harness | Guide |
 |---|---|
 | zcode | [docs/integrations/zcode.md](docs/integrations/zcode.md) |
 | Claude Code / Claude Desktop | [docs/integrations/claude-code.md](docs/integrations/claude-code.md) |
 | Cursor | [docs/integrations/cursor.md](docs/integrations/cursor.md) |
-| Любой другой MCP-клиент | [docs/integrations/generic-mcp.md](docs/integrations/generic-mcp.md) |
+| Any other MCP client | [docs/integrations/generic-mcp.md](docs/integrations/generic-mcp.md) |
 
 </details>
 
-## 🧠 Научить агента работать эффективно
+## 🧠 Teach your agent to work effectively
 
-Конфиг — только половина дела. Из коробки харнесс получает **instructions-playbook** (матрицу выбора инструментов), **annotations** и **три стратегии-промпта** — `bathys_deep_research`, `bathys_source_audit`, `bathys_fresh_scan`, — так что выбирает инструменты Bathys уже нативно. Сильнее — профиль: субагент [`agents/bathys-researcher.md`](agents/bathys-researcher.md) с двумя скиллами, которому глубокий ресёрч делегируется целиком; для клиентов, не показывающих MCP instructions, — дроп-ин [`agents/HARNESS-DROPIN.md`](agents/HARNESS-DROPIN.md) в `AGENTS.md` / `CLAUDE.md` / `.cursor/rules`.
+Configuration is only half the job. Out of the box the harness receives an **instructions-playbook** (a tool-choice matrix), **annotations** and **three strategy prompts** — `bathys_deep_research`, `bathys_source_audit`, `bathys_fresh_scan` — so it picks Bathys tools natively. Stronger still is the profile: the [`agents/bathys-researcher.md`](agents/bathys-researcher.md) subagent with three skills, to which deep research is delegated wholesale; for clients that do not surface MCP instructions, there is the [`agents/HARNESS-DROPIN.md`](agents/HARNESS-DROPIN.md) drop-in for `AGENTS.md` / `CLAUDE.md` / `.cursor/rules`.
 
-Пошаговая инструкция «из коробки → субагент → дроп-ин» и таблица сигналов футеров — в [«Живых кейсах», раздел C](docs/getting-started/cases.md#c-как-научить-харнесс-работать-с-bathys-эффективно).
+The step-by-step path "out of the box → subagent → drop-in" and the footer-signal table — in ["Live cases", section C](docs/getting-started/cases.md).
 
-## 🧭 Ходовые кейсы
+## 🧭 Common use cases
 
-**Сравнение технологий.** На вопрос «что выбрать под нагрузку в 2026?» агент делает один `deep_research`, доуточняет запрос терминами из найденного и верифицирует вывод по двум источникам: один вызов вместо цепочки «поиск + N чтений», в контекст попадает 7.5k символов вместо ~35k.
+**Technology comparison.** Asked "which one to pick for heavy load in 2026?", the agent makes a single `deep_research`, refines the query with terms from what it found, and verifies the conclusion against two sources: one call instead of a "search + N reads" chain, and 7.5k characters reach the context instead of ~35k.
 
 ```text
 [bathys: 34 raw hits, top 8 considered · dove 3 pages · 35669 ch fetched → 7508 ch returned · 1.3s]
 ```
 
-**Аудит спорного утверждения.** «Правда ли, что в X упали замеры?» — агент берёт стратегию `bathys_source_audit`: пакетно читает ссылки из обсуждения, ищет опровержения и выносит вердикт по каждому тезису с URL. Битая ссылка стоит одну строку, а не сорванный вызов.
+**Auditing a contested claim.** "Is it true that the benchmarks for X dropped?" — the agent takes the `bathys_source_audit` strategy: reads the links from the discussion in batch, searches for rebuttals, and delivers a verdict with a URL for each thesis. A dead link costs one line, not a broken call.
 
-**Свежий срез.** «Что нового в Y за две недели?» — стратегия `bathys_fresh_scan`: поиск с `time_range=week`, пакетное чтение, сводка с датами; протухший `cache HIT` лечится одним `refresh=true`.
+**A fresh snapshot.** "What's new in Y in the last two weeks?" — the `bathys_fresh_scan` strategy: a search with `time_range=week`, batch reading, a dated summary; a stale `cache HIT` is cured by a single `refresh=true`.
 
-Полный разбор всех кейсов — пользовательских, автономных агентов и эксплуатации — с живыми диалогами: **[docs/getting-started/cases.md](docs/getting-started/cases.md)**.
+A full walkthrough of all the cases — user-facing, autonomous agents and operations — with live dialogues: **[docs/getting-started/cases.md](docs/getting-started/cases.md)**.
 
-## 🛠 Инструменты
+## 🛠 Tools
 
-| Инструмент | Что делает |
+| Tool | What it does |
 |---|---|
-| `deep_research(query, max_sources=3, …)` | ищет, параллельно читает топ-источники, возвращает слитый дистиллят под запрос. Первый вызов для любого ресёрч-вопроса. |
-| `web_search(query, max_results=8, …)` | ранжированный список ссылок со сниппетами без содержимого страниц; `as_json=true` — чистый JSON для программ. |
-| `read_url(url, query=None, find=None)` | читает страницу (включая текстовые PDF); с `query` — релевантные пассажи; с `find` — точный поиск по кэшу сырца без сети. |
-| `library_docs(library, query)` | актуальная документация библиотеки из первоисточника, дистиллированная под вопрос; повторы бесплатны (кэш). |
-| `read_urls(urls, query=None, total_chars=12000)` | пакетно читает до 10 известных страниц; бюджет делится между успешными, сбой страницы — одна строка, не сорванный вызов. |
+| `deep_research(query, max_sources=3, …)` | searches, reads the top sources in parallel, returns a merged query-tailored distillate. The first call for any research question. |
+| `web_search(query, max_results=8, …)` | a ranked list of links with snippets, without page content; `as_json=true` — clean JSON for programs. |
+| `read_url(url, query=None, find=None)` | reads a page (including text PDFs); with `query` — relevant passages; with `find` — exact search over the source cache without the network. |
+| `library_docs(library, query)` | up-to-date library documentation from the primary source, distilled to the question; repeat calls are free (cache). |
+| `read_urls(urls, query=None, total_chars=12000)` | batch-reads up to 10 known pages; the budget is split across the successes, and a failed page costs one line, not a broken call. |
+| `source_check(claim, urls?)` | deterministic claim verification without an LLM: sources → parallel dives → verdict `SUPPORTED/CONTRADICTED/UNCLEAR/MISSING-EVIDENCE` with confidence; source classes, a domain-independence cap. |
 
-Поиск сужается общими фильтрами `time_range`, `category`, `engines`, `language`. Живой футер ответа показывает сжатие и кэш: `[bathys: 41 raw hits, top 3 considered · dove 3 pages · 35669 ch fetched → 7508 ch returned · 3.2s]`.
+Search is narrowed by the shared `time_range`, `category`, `engines`, `language` filters. The live footer of a response shows compression and cache: `[bathys: 41 raw hits, top 3 considered · dove 3 pages · 35669 ch fetched → 7508 ch returned · 3.2s]`.
 
-## 📊 Экономия токенов
+## 📊 Token savings
 
-Шкала честная и символьная, токены ≈ `chars/4`; каждая цифра взята из футера реального вызова.
+The scale is honest and character-based; tokens ≈ `chars/4`; every figure is taken from the footer of a real call.
 
-| Вызов | Из сети | Агенту | Сжатие |
+| Call | From the network | To the agent | Compression |
 |---|---|---|---|
-| `web_search` | 37 549 симв. | 1 986 симв. | 18.9× |
-| `read_url` | 17 063 симв. | 2 325 симв. | 7.3× |
-| `deep_research` (3 страницы) | 35 669 симв. | 7 508 симв. | 4.7× |
+| `web_search` | 37,549 chars | 1,986 chars | 18.9× |
+| `read_url` | 17,063 chars | 2,325 chars | 7.3× |
+| `deep_research` (3 pages) | 35,669 chars | 7,508 chars | 4.7× |
 
-- **Двухъярусное извлечение** — обычные страницы читает собственный HTTP-движок (миллисекунды, без браузера), JS-оболочки — headless-Chromium; дальше дистилляция под запрос с жёсткими бюджетами символов.
-- **Кэш сырца до дистилляции** — SQLite хранит сырой текст, поэтому перечитать страницу под другим углом можно бесплатно и без сети.
-- **Ноль облачных квот** — `deep_research` заменяет цепочку «поиск + N чтений», то есть N+1 списаний квоты, одним локальным вызовом.
+- **Two-tier extraction** — regular pages are read by the built-in HTTP engine (milliseconds, no browser) and JS shells by headless Chromium; then query-tailored distillation with hard character budgets.
+- **Source cache before distillation** — SQLite stores the raw text, so re-reading a page from a different angle is free and requires no network.
+- **Zero cloud quotas** — `deep_research` replaces a "search + N reads" chain — that is, N+1 quota charges — with a single local call.
 
-Методика и пороги — в [docs/operations/metrics.md](docs/operations/metrics.md).
+The methodology and thresholds — in [docs/operations/metrics.md](docs/operations/metrics.md).
 
-## 📚 Документация
+## 📚 Documentation
 
-| Раздел | Что внутри | Кому |
+| Section | What's inside | Who it's for |
 |---|---|---|
-| [docs/index.md](docs/index.md) | Хаб: дерево документации и три маршрута чтения | всем — точка входа |
-| [getting-started](docs/getting-started/install.md) | [Установка](docs/getting-started/install.md) · [конфигурация (20 env)](docs/getting-started/configure.md) · [подключение](docs/getting-started/integrate.md) · [живые кейсы](docs/getting-started/cases.md) | новичку |
-| [integrations](docs/integrations/overview.md) | [Обзор подключения](docs/integrations/overview.md) · [zcode](docs/integrations/zcode.md) · [Claude Code](docs/integrations/claude-code.md) · [Cursor](docs/integrations/cursor.md) · [любой MCP-клиент](docs/integrations/generic-mcp.md) | при подключении харнесса |
-| [architecture](docs/architecture/overview.md) | [Компоненты](docs/architecture/overview.md) · [конвейер очистки](docs/architecture/pipeline.md) · [потоки данных](docs/architecture/data-flow.md) | контрибьютору |
-| [contracts](docs/contracts/mcp-tools.md) | [Инструменты](docs/contracts/mcp-tools.md) · [форматы вывода](docs/contracts/output-format.md) · [модули](docs/contracts/module-contracts.md) · [конфигурация](docs/contracts/config.md) | интегратору |
-| [operations](docs/operations/runbook.md) | [Runbook](docs/operations/runbook.md) · [метрики токен-экономии](docs/operations/metrics.md) | эксплуатация |
-| [product](docs/product/charter.md) | [Хартия](docs/product/charter.md) · [функции](docs/product/features.md) · [роадмап](docs/product/roadmap.md) · [конкуренты](docs/product/competitive.md) | владельцу продукта |
-| [adr](docs/adr/0001-python-crawl4ai.md) | Шесть принятых архитектурных решений | контрибьютору |
-| [meta](docs/meta/style-guide.md) | [Стайлгайд доков](docs/meta/style-guide.md) · [глоссарий](docs/meta/glossary.md) | авторам доков |
+| [docs/index.md](docs/index.md) | The hub: the documentation tree and three reading routes | everyone — the entry point |
+| [getting-started](docs/getting-started/install.md) | [Installation](docs/getting-started/install.md) · [configuration (20 env)](docs/getting-started/configure.md) · [wiring up](docs/getting-started/integrate.md) · [live cases](docs/getting-started/cases.md) | a newcomer |
+| [integrations](docs/integrations/overview.md) | [Wiring overview](docs/integrations/overview.md) · [zcode](docs/integrations/zcode.md) · [Claude Code](docs/integrations/claude-code.md) · [Cursor](docs/integrations/cursor.md) · [any MCP client](docs/integrations/generic-mcp.md) | when wiring up a harness |
+| [architecture](docs/architecture/overview.md) | [Components](docs/architecture/overview.md) · [the cleaning pipeline](docs/architecture/pipeline.md) · [data flows](docs/architecture/data-flow.md) | a contributor |
+| [contracts](docs/contracts/mcp-tools.md) | [Tools](docs/contracts/mcp-tools.md) · [output formats](docs/contracts/output-format.md) · [modules](docs/contracts/module-contracts.md) · [configuration](docs/contracts/config.md) | an integrator |
+| [operations](docs/operations/runbook.md) | [Runbook](docs/operations/runbook.md) · [token-savings metrics](docs/operations/metrics.md) | operations |
+| [product](docs/product/charter.md) | [Charter](docs/product/charter.md) · [features](docs/product/features.md) · [roadmap](docs/product/roadmap.md) · [competitors](docs/product/competitive.md) | the product owner |
+| [adr](docs/adr/0001-python-crawl4ai.md) | Six accepted architectural decisions | a contributor |
+| [meta](docs/meta/style-guide.md) | [Docs style guide](docs/meta/style-guide.md) · [glossary](docs/meta/glossary.md) | docs authors |
 
-Вне `docs/`: [agents/](agents/) — субагент, скиллы, дроп-ин · [integrations/](integrations/) — кастомные интеграции (hermes, pi, zcode) · [install.sh](install.sh) — установочный скрипт · [npm/bathys-mcp/](npm/bathys-mcp/) — NPM-обёртка · [tests/](tests/) — юнит-тесты · [CHANGELOG.md](CHANGELOG.md) — история выпусков.
+Outside `docs/`: [agents/](agents/) — the subagent, skills, drop-in · [integrations/](integrations/) — custom integrations (hermes, pi, zcode) · [install.sh](install.sh) — the install script · [npm/bathys-mcp/](npm/bathys-mcp/) — the NPM wrapper · [tests/](tests/) — unit tests · [CHANGELOG.md](CHANGELOG.md) — release history.
 
-## 📍 Статус
+## 📍 Status
 
-**0.14.0.** Выпускная история: v0.2 «Качество выдачи» (ретраи, здоровье движков), v0.3 «Паритет с Tavily» (`read_urls`, JSON-режим), v0.4 «Эксплуатация» (robots-этика, метрики, `bathys-doctor`), v0.5 «Identity & Harness» (репозиционирование, промпты, субагент), v0.6 «Native Install» (`bathys install`), v0.7 «Ship & Setup» (двухъярусное извлечение, `bathys setup`, однострочник, uninstall) — итоги в [CHANGELOG.md](CHANGELOG.md).
+**0.14.1.** Release history: v0.2 "Result Quality" (retries, engine health), v0.3 "Parity with Tavily" (`read_urls`, JSON mode), v0.4 "Operations" (robots ethics, metrics, `bathys-doctor`), v0.5 "Identity & Harness" (repositioning, prompts, subagent), v0.6 "Native Install" (`bathys install`), v0.7 "Ship & Setup" (two-tier extraction, `bathys setup`, the one-liner, uninstall), v0.8 "Engine Orchestration", v0.9 "Borrowed Ideas", v0.10–0.11 "Library Docs" (Phases 1–2), v0.12 "Deep Verdicts" (`source_check` + Phase 3), v0.13 "GitHub Tier & Deep Audit", v0.14 "Backlog Closed" — summaries in [CHANGELOG.md](CHANGELOG.md).
 
-Репозиторий: `github.com/Korrnals/bathys`. Пакет опубликован: [PyPI `bathys`](https://pypi.org/project/bathys/) (pip install), однострочник установки — выше. До 1.0: публикация npm-обёртки `bathys-mcp` и первый прогон Docker-образа; CI (matrix 3.10–3.12 + shellcheck) уже в репозитории.
+Repository: `github.com/Korrnals/bathys`. The package is published: [PyPI `bathys`](https://pypi.org/project/bathys/) (pip install); the install one-liner is above. Before 1.0: publishing the `bathys-mcp` npm wrapper, the first verified run of the Docker image (the Dockerfile ships with the package but has not been exercised in a container runtime yet), and a green CI (currently blocked by a GitHub Actions billing issue on the owner's account — see the failing runs, all "job was not started"); CI config (matrix 3.10–3.12 + shellcheck) is already in the repository.
 
-## 🙏 Благодарности
+## 🙏 Acknowledgements
 
-Bathys стоит на плечах выдающихся открытых проектов — спасибо их авторам и сообществам:
+Bathys stands on the shoulders of outstanding open projects — thanks to their authors and communities:
 
-- **[SearXNG](https://github.com/searxng/searxng)** — движок метапоиска (AGPL-3.0): Bathys запускает его как отдельный процесс и говорит с ним по локальному JSON API; исходники не модифицируются и не распространяются внутри пакета.
-- **[Crawl4AI](https://github.com/unclecode/crawl4ai)** — браузерный ярус извлечения (Apache-2.0).
+- **[SearXNG](https://github.com/searxng/searxng)** — the metasearch engine (AGPL-3.0): Bathys runs it as a separate process and talks to it over a local JSON API; its sources are not modified and are not distributed inside the package.
+- **[Crawl4AI](https://github.com/unclecode/crawl4ai)** — the browser tier of extraction (Apache-2.0).
 - **[MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk)** (MIT), **[httpx](https://www.python-httpx.org/)** (BSD-3), **[Playwright](https://playwright.dev/python/)** (Apache-2.0).
 
-Полные атрибуции и условия использования каждого компонента — в [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Full attributions and license terms for each component — in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-## ⚖️ Лицензия
+## ⚖️ License
 
-Код Bathys — [MIT](LICENSE). Компоненты, которые Bathys устанавливает и использует, лицензированы отдельно и перечислены в [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) (в частности, SearXNG — под AGPL-3.0, с соблюдением её условий).
+Bathys code is [MIT](LICENSE). The components that Bathys installs and uses are licensed separately and listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) (in particular, SearXNG is under AGPL-3.0, with its terms honored).

@@ -42,10 +42,10 @@ Bathys», вставьте дроп-ин блок в `AGENTS.md` (пользов
 cp agents/bathys-researcher.md ~/.zcode/agents/
 ```
 
-Скиллы `agents/skills/bathys-deep-dive/` и `agents/skills/bathys-source-audit/`
-скопируйте в каталог скиллов вашего харнесса (расположение зависит от установки
-zcode). Субагент и скиллы не требуют отдельных настроек: они пользуются теми же
-инструментами Bathys, что и основной агент.
+Скиллы `agents/skills/bathys-deep-dive/`, `agents/skills/bathys-source-audit/` и
+`agents/skills/bathys-find-docs/` скопируйте в каталог скиллов вашего харнесса
+(расположение зависит от установки zcode). Субагент и скиллы не требуют отдельных
+настроек: они пользуются теми же инструментами Bathys, что и основной агент.
 
 ## Что изменится после подключения
 

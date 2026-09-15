@@ -1,12 +1,13 @@
 # All-in-one image: bathys MCP server + native SearXNG + headless chromium.
 #
-# STATUS: written for v1.0 (F-404), NOT yet tested in a real container runtime —
-# the development box has no docker (distrobox). Before publishing, run:
-#   docker build -t bathys .
-#   docker run --rm -i -e BATHYS_START_MODE=native bathys < scripts/stdio_check-ish JSON
-# and only then treat this file as verified. Native mode inside the container
-# git-clones SearXNG on first call (git/curl present below) and pins the
-# reviewed commit from config.SEARXNG_REF.
+# STATUS (2026-09-15): still NOT verified in a container runtime. docker is
+# absent on the dev box; podman 4.9.3 is present but cannot start — the
+# distrobox /etc/subuid declares abyss:100000:65536 while the HOST range is
+# abyss:524288:65536, so newuidmap fails with "write to uid_map failed:
+# Operation not permitted". Fix (needs root on the host or inside the box):
+#   sed -i 's/^abyss:100000:65536$/abyss:524288:65536/' /etc/subuid
+# then `podman system migrate` and build:
+#   podman build -t bathys . && podman run --rm -i bathys < scripts/stdio_smoke.json
 
 FROM python:3.12-slim
 

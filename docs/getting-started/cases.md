@@ -92,7 +92,7 @@
 
 ## B. Кейсы агентов-специалистов
 
-Эти кейсы автономны: субагент [`bathys-researcher`](../../agents/bathys-researcher.md) и скиллы [`bathys-deep-dive`](../../agents/skills/bathys-deep-dive/SKILL.md) / [`bathys-source-audit`](../../agents/skills/bathys-source-audit/SKILL.md) выполняются внутри харнесса, человека в цикле нет. Установка — в гайдах [zcode](../integrations/zcode.md) и [Claude Code](../integrations/claude-code.md).
+Эти кейсы автономны: субагент [`bathys-researcher`](../../agents/bathys-researcher.md) и скиллы [`bathys-deep-dive`](../../agents/skills/bathys-deep-dive/SKILL.md) / [`bathys-source-audit`](../../agents/skills/bathys-source-audit/SKILL.md) / [`bathys-find-docs`](../../agents/skills/bathys-find-docs/SKILL.md) выполняются внутри харнесса, человека в цикле нет. Установка — в гайдах [zcode](../integrations/zcode.md) и [Claude Code](../integrations/claude-code.md).
 
 ### 🤖 B1. Код-ревьюер встречает незнакомую библиотеку
 
@@ -145,7 +145,10 @@ cp agents/bathys-researcher.md ~/.zcode/agents/     # zcode
 mkdir -p .claude/agents && cp agents/bathys-researcher.md .claude/agents/   # Claude Code
 ```
 
-Скиллы `agents/skills/bathys-deep-dive/` и `agents/skills/bathys-source-audit/` скопируйте в каталог скиллов харнесса. После этого глубокий ресёрч можно делегировать целиком — субагент работает только через Bathys.
+Скиллы `agents/skills/bathys-deep-dive/`, `agents/skills/bathys-source-audit/` и
+`agents/skills/bathys-find-docs/` скопируйте в каталог скиллов харнесса. После
+этого глубокий ресёрч можно делегировать целиком — субагент работает только через
+Bathys.
 
 **Дроп-ин.** Если харнесс не показывает MCP instructions модели, вставьте канонический блок из [`agents/HARNESS-DROPIN.md`](../../agents/HARNESS-DROPIN.md) в файл инструкций (`AGENTS.md`, `CLAUDE.md`, `.cursor/rules/*.mdc`). Блок самодостаточен: после него агент не ходит в интернет мимо инструментов Bathys.
 
