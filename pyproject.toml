@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "bathys"
-version = "0.14.0"
+version = "0.14.1"
 description = "Unified local deep-research search service for AI agents — one pipeline (search → extraction → query distillation → cache), zero cloud quotas. MCP stdio server with native harness integration (bathys install)."
 keywords = ["mcp", "deep-research", "search", "web-search", "ai-agents", "llm", "local-first", "distillation", "searxng", "crawl4ai"]
 classifiers = [
@@ -26,6 +26,9 @@ dependencies = [
     "mcp>=1.2.0,<2",
     "httpx>=0.27",
     "crawl4ai>=0.6.0",
+    # PDF text-layer is a core v0.9+ feature (crawler._pdf_text) — it was
+    # missing from deps and broke fresh installs (caught in local verify)
+    "pymupdf>=1.24",
 ]
 
 [project.urls]
